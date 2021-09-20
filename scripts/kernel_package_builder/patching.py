@@ -1,0 +1,166 @@
+# Copyright (c) Resurgent Technologies 2021
+
+from .common import *
+from .git import *
+import distutils.dir_util
+
+
+def select_patches_dir(image_name, patches_root_dir='./patches', verbose=False):
+    """
+    Search patches for something that should match.
+
+    :param image_name: name of deb package
+    :param patches_root_dir: root of patches dir
+    :param verbose:
+    :return: path to directory with patches for this kernel or None
+    """
+    m = re.search("(\d\.\d+)", image_name)
+    a = m.group(0)
+    b = a.split('.')
+    major = b[0]
+    minor = b[1]
+
+    if find_directory(searchdir=patches_root_dir, matchdir=major) is None:
+        print("can't find {} kernel in {} - image_name: {}".format(major, patches_root_dir, image_name))
+        return None
+    major_dir = os.path.join(os.path.abspath(patches_root_dir), major)
+    if find_directory(searchdir=major_dir, matchdir=minor) is not None:
+        minor_dir = os.path.join(major_dir, minor)
+        return minor_dir
+    iminor = int(minor)
+    for i in range(iminor + 1):
+        j = iminor - i
+        if find_directory(searchdir=major_dir, matchdir="{}".format(j)) is not None:
+            if verbose:
+                print("Couldn't find patch for {}.{}, trying next best option {}.{}".format(major, minor, major, j))
+            minor_dir = os.path.join(major_dir, "{}".format(j))
+            return minor_dir
+    print("Couldn't find and patches for {}.{}".format(major, minor))
+    return None
+
+
+def commit_and_create_patch(patchname, src_dir, commit_hash=None, verbose=False):
+    if commit_hash is None:
+        commit_hash = git_hash(workingdir=src_dir, verbose=verbose)
+    git_add("*", workingdir=src_dir, verbose=verbose)
+    git_commit(patchname, workingdir=src_dir, verbose=verbose)
+    filepath = "{}.new".format(patchname)
+    git_diff(commit_hash, filepath, workingdir=src_dir, verbose=verbose)
+
+
+def copy_files_into_src(path, src_dir, clean_patch, allow_errors=False, verbose=False):
+    print("Copying {}".format(path))
+    dst_dir = os.path.join(src_dir, os.path.basename(path))
+    distutils.dir_util.copy_tree(path, dst_dir)
+    if clean_patch:
+        commit_and_create_patch(path, src_dir, verbose=verbose)
+    sys.stdout.flush()
+    sleep(1)
+
+
+def apply_patch(path, src_dir, clean_patch, allow_errors=False, verbose=False):
+    print("Patching {}".format(path))
+    _, files, _ = run_cmd("ls {}* | grep -v new$".format(path), allow_errors=allow_errors, verbose=verbose)
+    print("files = '{}'".format(files))
+    exitcode = 1
+    for file in files.split():
+        print("file = '{}'".format(file))
+        exitcode, _, _ = run_cmd("patch -p1 -F 100 -i {}".format(path), workingdir=src_dir, allow_errors=True, verbose=verbose)
+        # Clean up leftovers
+        cmd = "find . | grep .orig$ | sed 's/^/rm /' | bash"
+        run_cmd(cmd, workingdir=src_dir, allow_errors=True, verbose=verbose)
+        cmd = "find . | grep .rej$ | sed 's/^/rm /' | bash"
+        run_cmd(cmd, workingdir=src_dir, allow_errors=True, verbose=verbose)
+        if exitcode == 0:
+            break
+    if exitcode != 0 and not allow_errors:
+        sys.stdout.flush()
+        sleep(1)
+        raise
+    if clean_patch:
+        commit_and_create_patch(path, src_dir, verbose=verbose)
+    sys.stdout.flush()
+    sleep(1)
+
+
+def merge_c_file(path, src_dir, clean_patch, verbose=False):
+    """
+    Merging contents from .merge file into c file.  Uses convention
+    """
+    a = os.path.basename(path)
+    b = a.split("--")
+    c = "/".join(b[0].split("__"))
+    dst_file = ".".join(c.split("_"))
+    print("Merging {} into {}".format(path, dst_file))
+
+    insertion_point = "//{}//".format(b[1])
+    print("insertion_point = {}".format(insertion_point))
+    dst_path = os.path.join(src_dir, dst_file)
+    with open(dst_path, 'r') as file:
+        original_contents_array = file.readlines()
+    with open(path, 'r') as file:
+        insert_data = file.readlines()
+    new_contents = []
+    for line in original_contents_array:
+        if line.strip() == insertion_point:
+            for nline in insert_data:
+                new_contents.append(nline)
+            continue
+        new_contents.append(line)
+    new_file_contents = "".join(new_contents)
+    with open(dst_path, 'w') as file:
+        file.write(new_file_contents)
+    if clean_patch:
+        commit_and_create_patch(path, src_dir, verbose=verbose)
+    sys.stdout.flush()
+    sleep(1)
+
+
+def patch_in(distro, patches_dir, src_dir, allow_errors=False, verbose=False, clean_patch=False):
+    """
+    Apply patches, merge changelog files, and add files to kernel
+
+    :param distro: 
+    :param patches_dir: path containing patches
+    :param src_dir: path to kernel sources
+    """
+    if clean_patch:
+        init_commit = git_create_repo(src_dir, verbose=False)
+    else:
+        init_commit = None
+    subfolders = [f.path for f in os.scandir(patches_dir)]
+    sorted_subfolders = sorted(subfolders)
+    print(sorted_subfolders)
+    for path in sorted_subfolders:
+        print("evaluating '{}' for patching".format(path))
+        sys.stdout.flush()
+        sleep(1)
+        if os.path.isdir(path):
+            print("a")
+            copy_files_into_src(path, src_dir, clean_patch, allow_errors=allow_errors, verbose=verbose)
+        elif os.path.splitext(path)[-1] == ".{}".format(distro):
+            print("b")
+            apply_patch(path, src_dir, clean_patch, verbose=verbose)
+        elif os.path.splitext(path)[-1] == '.patch':
+            print("c")
+            distro_filepath = os.path.splitext(path)[0]
+            if os.path.exists("{}.{}".format(distro_filepath, distro)):
+                # Don't apply if it conflicts
+                continue
+            print("d")
+            apply_patch(path, src_dir, clean_patch, verbose=verbose)
+        elif os.path.splitext(path)[-1] == '.merge':
+            print("e")
+            merge_c_file(path, src_dir, clean_patch, verbose=verbose)
+    return init_commit
+
+
+def make_unified_patch(distro, patches_dir, tarball, allow_errors=False, verbose=False, builddir='./build/kernel_source'):
+    run_cmd("rm -rf {};".format(builddir), allow_errors=True, verbose=verbose)
+    cmd = "mkdir -p {}; cd {}; tar xvf {}".format(builddir, builddir, tarball)
+    run_cmd(cmd, allow_errors=allow_errors, verbose=verbose)
+    src_dir = find_directory(searchdir=builddir)
+    init_commit = patch_in(distro, patches_dir, src_dir, allow_errors=allow_errors, verbose=verbose, clean_patch=True)
+    filepath = os.path.join(patches_dir, "complete.patch.new")
+    git_diff(init_commit, filepath, workingdir=src_dir, verbose=verbose)
+    return filepath

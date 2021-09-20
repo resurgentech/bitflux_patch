@@ -1,0 +1,8 @@
+---
+- name: Install dependancies for build / test
+  hosts: all
+  remote_user: root
+  roles:
+    - common
+    - kernelhacks
+    - bitflux_collector

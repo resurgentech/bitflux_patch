@@ -1,0 +1,5 @@
+FROM resurgentech/kernel_build-popos2004:latest
+
+COPY . /bitflux
+RUN mkdir -p /bitflux/build
+WORKDIR /bitflux

@@ -1,0 +1,24 @@
+{
+  "distros": {
+    "ubuntu2004": {
+      "build_style": "deb",
+      "image_searchfactors": ["^linux-image-unsigned-", "generic$"],
+      "ver_ref_pkg": "linux-image-unsigned",
+      "pkg_filters": ["hwe", "cloud", "dkms", "tools", "buildinfo"],
+      "metapkg_template": "linux-image-swaphints"
+    },
+    "popos2004": {
+      "build_style": "deb",
+      "image_searchfactors": ["^linux-image-\\d.\\d+", "generic$"],
+      "ver_ref_pkg": "linux-image-generic",
+      "pkg_filters": ["hwe", "cloud", "dkms", "tools", "buildinfo"],
+      "metapkg_template": "linux-image-swaphints"
+    },
+    "centos8": {
+      "build_style": "rpm"
+    },
+    "fedora34": {
+      "build_style": "rpm"
+    }
+  }
+}

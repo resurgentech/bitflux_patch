@@ -1,0 +1,14 @@
+---
+- name: Copy bitflux client packages to platforms
+  copy:
+    src: collectordebs
+    dest: /tmp
+
+- name: Install bitflux client dependencies
+  apt:
+    name: [ libminizip1, qt5-default ] #libqt5core5a, libqt5network5, libminizip1 ]
+    state: present
+
+#TODO - Update
+- name: Install bitflux client packages
+  shell: dpkg -i /tmp/collectordebs/*.deb

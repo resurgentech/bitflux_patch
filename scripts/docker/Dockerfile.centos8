@@ -1,0 +1,5 @@
+FROM resurgentech/kernel_build-centos8:latest
+
+COPY . /bitflux
+RUN mkdir -p /bitflux/build
+WORKDIR /bitflux

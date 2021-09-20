@@ -1,0 +1,8 @@
+---
+- name: Copy bitflux kernel packages to platforms
+  copy:
+    src: kerneldebs
+    dest: /tmp
+
+- name: Install bitflux kernel packages
+  shell: dpkg -i /tmp/kerneldebs/*.deb

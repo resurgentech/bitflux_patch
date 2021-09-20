@@ -1,0 +1,15 @@
+---
+- name: Update apt and upgrade packages
+  apt:
+    upgrade: dist
+    update_cache: yes
+
+- name: Ubuntu Install python
+  apt:
+    name: [ python-apt, python3-apt, python3-pip ]
+    state: present
+
+- name: Ubuntu Common development tools
+  apt:
+    name: [ build-essential, cmake, git]
+    state: present

@@ -1,0 +1,14 @@
+---
+- name: Update yum
+  dnf:
+    update_cache: yes
+
+- name: Centos Common development tools
+  dnf:
+    name: [ "@Development Tools", cmake, git, dnf-plugins-core ]
+    state: present
+
+- name: Install python3.8
+  dnf:
+    name: [ python38, python38-devel ]
+    state: latest
