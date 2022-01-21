@@ -15,12 +15,15 @@ def test_kernel_build(args):
     filename = "linux-{}.tar.xz".format(kernel_version)
     filepath = os.path.join(build_dir, filename)
     src_dir = os.path.join(build_dir, "linux-{}".format(kernel_version))
-    run_cmd("rm -rf {}; rm -rf {}".format(filepath, src_dir), verbose=False)
+    run_cmd("rm -rf {}".format(src_dir), verbose=False)
+    if args.clean:
+        run_cmd("rm -rf {}".format(filepath), verbose=False)
     major = kernel_version.split(".")[0]
     url = "https://cdn.kernel.org/pub/linux/kernel/v{}.x/{}".format(major, filename)
     print("Found kernel url path: {}".format(url))
     print("Found kernel src directory: {}".format(src_dir))
-    print("Downloading {}".format(filepath))
+    if not os.path.exists(filepath):
+        print("Downloading {}".format(filepath))
     sys.stdout.flush()
     run_cmd("mkdir -p {}".format(build_dir), verbose=False)
     download_file(url, filepath)

@@ -119,6 +119,9 @@ def make_artifactory_file_spec(distro, outputdir='./output'):
     if distro == 'centos8':
         chunk['pattern'] = "{}/*.rpm".format(outputdir)
         chunk['target'] = "yum/centos/8/x86_64/"
+    elif distro == 'rockylinux8':
+        chunk['pattern'] = "{}/*.rpm".format(outputdir)
+        chunk['target'] = "yum/rocky/8/x86_64/"
     elif distro == 'fedora34':
         chunk['pattern'] = "{}/*.rpm".format(outputdir)
         chunk['target'] = "yum/fedora/34/x86_64/"

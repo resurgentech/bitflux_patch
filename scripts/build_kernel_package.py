@@ -14,6 +14,8 @@ if __name__ == '__main__':
     default_configfile = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'kernel_package_builder', 'configs.json')
     parser.add_argument('--config', help='Path to config file for defaults and such', default=default_configfile, action='store_true')
     parser.add_argument('--nobuild', help='Don\'t build', action='store_true')
+    parser.add_argument('--clean', help='Extra clean up steps', action='store_true')
+
     args = parser.parse_args()
 
     configs = read_json_file(args.config)
@@ -24,12 +26,6 @@ if __name__ == '__main__':
             args.print_help()
             sys.exit(1)
         test_kernel_build(args)
-        # 5.4.120 - patches / okay
-        # 5.8.18 - patches / okay
-        # 5.9.16 - patches / okay
-        # 5.10.38 - patches / okay
-        # 5.11.22 - patches / warnings
-        # 5.12.5 - patches / warnings
         sys.exit(1)
 
     if configs['distros'].get(args.distro, None) is None:

@@ -55,3 +55,10 @@ Contains config and scripts to make and config vms.
 - **setup.sh** - `./scripts/vagrant/setup.sh centos8`  will setup a vm and run ansible to install bitflux.
 
 - **teardown.sh** - `./scripts/vagrant/teardown.sh centos8`  will destroy the vm created with setup.sh.
+
+
+# Notes
+- 5.13.19 - patches 
+- 5.14.21 - fails to build
+- 5.15.15
+- 5.16.1
