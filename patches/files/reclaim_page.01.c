@@ -34,7 +34,7 @@ static unsigned long reclaim_page(struct page *p, struct scan_control *sc)
 
 	spin_lock_irq(lru_lock);
 	srclruid = page_lru(page);
-	pagezoneid = page_zone_id(page);
+	pagezoneid = (unsigned int)page_zonenum(page);
 #if LINUX_VERSION_CODE > KERNEL_VERSION(4, 20, 99)
 	nr_pages = compound_nr(page);
 #else
@@ -79,9 +79,7 @@ static unsigned long reclaim_page(struct page *p, struct scan_control *sc)
 	switch (__isolate_lru_page(page, 0)) {
 	case 0:
 #endif
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 20, 99)
 		ClearPageActive(page);
-#endif
 		list_move(&page->lru, &node_page_list);
 		nr_zone_taken[pagezoneid] = nr_pages;
 		update_lru_sizes(lruvec, srclruid, nr_zone_taken);

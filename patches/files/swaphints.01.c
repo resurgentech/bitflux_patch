@@ -21,7 +21,7 @@
 #include <linux/writeback.h>
 
 MODULE_DESCRIPTION("Proc File Enabled Swap Hint Handler.");
-#define VERSION_NUMBER "0.61"
+#define VERSION_NUMBER "0.62"
 MODULE_VERSION(VERSION_NUMBER);
 
 #define BUFSIZE 1024
