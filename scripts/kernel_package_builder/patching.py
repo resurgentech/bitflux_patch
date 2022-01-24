@@ -58,7 +58,7 @@ def copy_files_into_src(path, src_dir, clean_patch, allow_errors=False, verbose=
     sleep(1)
 
 
-def apply_patch(path, src_dir, clean_patch, allow_errors=False, verbose=False):
+def apply_patch_deprecated(path, src_dir, clean_patch, allow_errors=False, verbose=False):
     print("Patching {}".format(path))
     _, files, _ = run_cmd("ls {}* | grep -v new$".format(path), allow_errors=allow_errors, verbose=verbose)
     print("files = '{}'".format(files))
@@ -83,6 +83,24 @@ def apply_patch(path, src_dir, clean_patch, allow_errors=False, verbose=False):
     sleep(1)
 
 
+def apply_patch(path, src_dir, clean_patch, allow_errors=False, verbose=False):
+    print("Patching {}".format(path))
+    exitcode, _, _ = run_cmd("patch -p1 -F 100 -i {}".format(path), workingdir=src_dir, allow_errors=True, verbose=verbose)
+    # Clean up leftovers
+    cmd = "find . | grep .orig$ | sed 's/^/rm /' | bash"
+    run_cmd(cmd, workingdir=src_dir, allow_errors=True, verbose=verbose)
+    cmd = "find . | grep .rej$ | sed 's/^/rm /' | bash"
+    run_cmd(cmd, workingdir=src_dir, allow_errors=True, verbose=verbose)
+    if exitcode != 0 and not allow_errors:
+        sys.stdout.flush()
+        sleep(1)
+        raise
+    if clean_patch:
+        commit_and_create_patch(path, src_dir, verbose=verbose)
+    sys.stdout.flush()
+    sleep(1)
+
+
 def merge_c_file(path, src_dir, clean_patch, verbose=False):
     """
     Merging contents from .merge file into c file.  Uses convention
@@ -93,7 +111,8 @@ def merge_c_file(path, src_dir, clean_patch, verbose=False):
     dst_file = ".".join(c.split("_"))
     print("Merging {} into {}".format(path, dst_file))
 
-    insertion_point = "//{}//".format(b[1])
+    d = "{}.merge".format(b[1].split('.merge')[0])
+    insertion_point = "//{}//".format(d)
     print("insertion_point = {}".format(insertion_point))
     dst_path = os.path.join(src_dir, dst_file)
     with open(dst_path, 'r') as file:
@@ -116,6 +135,95 @@ def merge_c_file(path, src_dir, clean_patch, verbose=False):
     sleep(1)
 
 
+def filter_dir(sorted_subfolders, src_dir, clean_patch, splitter, distro, only_dirs=False, allow_errors=False, verbose=False):
+    """
+    Filter paths in patching dir for .distro files
+    """
+    bucket = []
+    # Filter contents
+    for path in sorted_subfolders:
+        print("path={}".format(path))
+        if os.path.splitext(path)[1] == '.new':
+            continue
+        if only_dirs:
+            if not os.path.isdir(path):
+                print("only_dirs")
+                continue
+        else:
+            if os.path.isdir(path):
+                print("os.path.isdir(path)")
+                continue
+            if not splitter in path:
+                print("no splitter")
+                continue
+        split_path = path.split(splitter)
+        # name for distro specfic variant
+        print("split_path={}".format(split_path))
+        if split_path[-1] == '':
+            split_path.pop(-1)
+        print("distro={}".format(distro))
+        if distro is None:
+            distro_path = None
+        elif splitter == '.':
+            # special case for directories vs .patch/.merge files
+            distro_path = splitter.join([split_path[0]] + [distro])
+        else:
+            distro_path = splitter.join([split_path[0]] + [".{}".format(distro)])
+        print("distro_path={}".format(distro_path))
+        if len(split_path) > 2:
+            print("Not sure what this is '{}'".format(path))
+            continue
+        if len(split_path) > 1:
+            # only log path with extension if it's specific to this distro
+            if distro_path == path:
+                print("distro_path == path")
+                bucket.append(path)
+            print("len(split_path) > 1")
+            continue
+        if distro_path is None:
+            bucket.append(path)
+        else:
+            if not os.path.exists(distro_path):
+                print("adding path")
+                bucket.append(path)
+    print("filtering:")
+    print(bucket)
+    return bucket
+
+
+def patch_copy_dirs(sorted_subfolders, src_dir, clean_patch, distro, allow_errors=False, verbose=False):
+    """
+    Copy directory trees
+    """
+    bucket = filter_dir(sorted_subfolders, src_dir, clean_patch, '.', distro, only_dirs=True, allow_errors=allow_errors, verbose=verbose)
+    print("Copying Directories:")
+    print(bucket)
+    for path in bucket:
+        copy_files_into_src(path, src_dir, clean_patch, allow_errors=allow_errors, verbose=verbose)
+
+
+def apply_patches(sorted_subfolders, src_dir, clean_patch, distro, allow_errors=False, verbose=False):
+    """
+    Apply patches to sources
+    """
+    bucket = filter_dir(sorted_subfolders, src_dir, clean_patch, '.patch', distro, allow_errors=allow_errors, verbose=verbose)
+    print("Appyling Patches:")
+    print(bucket)
+    for path in bucket:
+        apply_patch(path, src_dir, clean_patch, verbose=verbose)
+
+
+def merge_c_files(sorted_subfolders, src_dir, clean_patch, distro, allow_errors=False, verbose=False):
+    """
+    Merge segments to sources
+    """
+    bucket = filter_dir(sorted_subfolders, src_dir, clean_patch, '.merge', distro, allow_errors=allow_errors, verbose=verbose)
+    print("Merge C files:")
+    print(bucket)
+    for path in bucket:
+        merge_c_file(path, src_dir, clean_patch, verbose=verbose)
+
+
 def patch_in(distro, patches_dir, src_dir, allow_errors=False, verbose=False, clean_patch=False):
     """
     Apply patches, merge changelog files, and add files to kernel
@@ -131,27 +239,9 @@ def patch_in(distro, patches_dir, src_dir, allow_errors=False, verbose=False, cl
     subfolders = [f.path for f in os.scandir(patches_dir)]
     sorted_subfolders = sorted(subfolders)
     print(sorted_subfolders)
-    for path in sorted_subfolders:
-        print("evaluating '{}' for patching".format(path))
-        sys.stdout.flush()
-        sleep(1)
-        if os.path.isdir(path):
-            print("a")
-            copy_files_into_src(path, src_dir, clean_patch, allow_errors=allow_errors, verbose=verbose)
-        elif os.path.splitext(path)[-1] == ".{}".format(distro):
-            print("b")
-            apply_patch(path, src_dir, clean_patch, verbose=verbose)
-        elif os.path.splitext(path)[-1] == '.patch':
-            print("c")
-            distro_filepath = os.path.splitext(path)[0]
-            if os.path.exists("{}.{}".format(distro_filepath, distro)):
-                # Don't apply if it conflicts
-                continue
-            print("d")
-            apply_patch(path, src_dir, clean_patch, verbose=verbose)
-        elif os.path.splitext(path)[-1] == '.merge':
-            print("e")
-            merge_c_file(path, src_dir, clean_patch, verbose=verbose)
+    patch_copy_dirs(sorted_subfolders, src_dir, clean_patch, distro, allow_errors=allow_errors, verbose=verbose)
+    apply_patches(sorted_subfolders, src_dir, clean_patch, distro, allow_errors=allow_errors, verbose=verbose)
+    merge_c_files(sorted_subfolders, src_dir, clean_patch, distro, allow_errors=allow_errors, verbose=verbose)
     return init_commit
 
 

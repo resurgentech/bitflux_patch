@@ -1,0 +1,26 @@
+diff --git a/include/linux/swap.h b/include/linux/swap.h
+index 136a929..7ca345e 100644
+--- a/include/linux/swap.h
++++ b/include/linux/swap.h
+@@ -352,6 +352,8 @@ extern unsigned long zone_reclaimable_pages(struct zone *zone);
+ extern unsigned long try_to_free_pages(struct zonelist *zonelist, int order,
+ 					gfp_t gfp_mask, nodemask_t *mask);
+ extern int __isolate_lru_page_prepare(struct page *page, isolate_mode_t mode);
++extern int request_reclaim_flusher_wakeup(void);
++extern int inject_reclaim_page(pg_data_t *pgdat, int order, int classzone_idx, struct page *page);
+ extern unsigned long try_to_free_mem_cgroup_pages(struct mem_cgroup *memcg,
+ 						  unsigned long nr_pages,
+ 						  gfp_t gfp_mask,
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 10feb87..aeee31f 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -3792,6 +3792,7 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
+ 	return 0;
+ }
+ 
++//__reclaim_page.merge//
+ /*
+  * A zone is low on free memory or too fragmented for high-order memory.  If
+  * kswapd should reclaim (direct reclaim is deferred), wake it up for the zone's
+

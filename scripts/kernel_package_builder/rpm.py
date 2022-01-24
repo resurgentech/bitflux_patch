@@ -97,23 +97,30 @@ def dnf_get_standard_kernel_srpm(kernel_version, allow_errors=False, verbose=Tru
 
 
 def dnf_get_kernel_tarball(filename, rpm_topdir, allow_errors=False, verbose=False):
-#    for files in os.listdir("{}/SOURCES/".format(rpm_topdir)):
-#        for file in files:
-#            if "linux" in file:
-#                if ".tar.xz" in file:
-#                    return "{}/SOURCES/{}".format(rpm_topdir,file)
-    m = re.search("(\d\.\d+\.\d+)", filename)
-    a = m.group(0)
-    if a.endswith(".0"):
-        a = a.rstrip(".0")
-    filename = "linux-{}.tar.xz".format(a)
-    if ("-4." in filename):
-        url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/{}".format(filename)
-    else:
-        url = "https://cdn.kernel.org/pub/linux/kernel/v5.x/{}".format(filename)
-    filepath = "{}/SOURCES/{}".format(rpm_topdir, filename)
-    download_file(url, filepath)
-    return filepath
+    # Pull tarball from srpm
+    try: 
+        for file in os.listdir("{}/SOURCES/".format(rpm_topdir)):
+            print(file)
+            if not "linux" in file:
+                continue
+            if not ".tar.xz" in file:
+                continue
+            return "{}/SOURCES/{}".format(rpm_topdir,file)
+        raise
+    # pull tarball of base kernel
+    except:
+        m = re.search("(\d\.\d+\.\d+)", filename)
+        a = m.group(0)
+        if a.endswith(".0"):
+            a = a.rstrip(".0")
+        filename = "linux-{}.tar.xz".format(a)
+        if ("-4." in filename):
+            url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/{}".format(filename)
+        else:
+            url = "https://cdn.kernel.org/pub/linux/kernel/v5.x/{}".format(filename)
+        filepath = "{}/SOURCES/{}".format(rpm_topdir, filename)
+        download_file(url, filepath)
+        return filepath
 
 
 def rpm_upack_srpm(srpm_filename, allow_errors=False, verbose=False, builddir='./build'):
@@ -210,6 +217,7 @@ def rpm_style_build(args, configs):
 
     tarball = dnf_get_kernel_tarball(srpm_filename, rpm_topdir, allow_errors=False, verbose=False)
 
+    print(tarball)
     patchfile_path = make_unified_patch(args.distro, patches_dir, tarball, allow_errors=False, verbose=False)
     print("Created patch file:         {}".format(patchfile_path))
     sys.stdout.flush()

@@ -15,18 +15,24 @@ Contains shared files used to push to kernels.  These are symlinked into the ind
 ### ./patches/[4,5] - major version number
 Contains sub-directories for supported minor versions.  Some supported minor versions lack a unique directory.  For example, 5.10 works with the 5.9 patch set so therefore there is no ./patches/5/10 directory.
 
-### File types
-### * .patch / .patch.*
-Patch files are applied in order until one successfully applies.  This is for when distros change a few little things.
+### Patching Artifacts
+#### .\<distro\>
+If a file/directory exists with the distro name, the .distro variant will supersede the default.
 
-### *.merge
+#### directories
+Directories are copied into the target kernel
+
+#### * .patch
+In alphabetic order apply patches
+
+#### *.merge
 These are very convention over configuration style hacky tools.
 
 We patch in a placeholder to a file such as `//__reclaim_page.merge//`
 Then we make a file or symlink containing contents we want with a strict naming convention.
 For example, `mm__vmscan_c--__reclaim_page.merge` will merge its contents into the file `mm/vmscan.c` in the kernel sources directory replacing the line `//__reclaim_page.merge//`.
 
-### *.new
+#### *.new
 These are generated as patch steps are applied.  `complete.patch.new` is the entire patch set rolled into one patch.
 
 ## Scripts
@@ -57,8 +63,9 @@ Contains config and scripts to make and config vms.
 - **teardown.sh** - `./scripts/vagrant/teardown.sh centos8`  will destroy the vm created with setup.sh.
 
 
-# Notes
-- 5.13.19 - patches 
-- 5.14.21 - fails to build
+# Build Notes
+- 5.13.19 - patches and builds
+- 5.14.21 - patches but fails to build
 - 5.15.15
 - 5.16.1
+- https://download.rockylinux.org/pub/rocky/8/BaseOS/source/tree/Packages/k/kernel-4.18.0-348.12.2.el8_5.src.rpm - patches and builds
