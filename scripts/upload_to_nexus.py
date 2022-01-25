@@ -10,15 +10,15 @@ import sys
 
 def post(input_url, release_type, username, password, config, filename):
     url = "{}?repository={}".format(input_url, config['upload']['repository'])
+    if "__RELEASE__" in url:
+        url = url.replace("__RELEASE__", release_type)
     headers = {'accept': 'application/json', 'Content-Type': 'multipart/form-data'}
     payload = {}
     for k, v in config['upload']['form'].items():
         if v == "__FILECONTENTS__":
-            open(filename, 'rb')
+            payload[k] = open(filename, 'rb')
         elif v == "__FILENAME__":
-            os.path.basename(filename)
-        elif "__RELEASE__" in v:
-            payload[k] = v.replace("__RELEASE__", release_type)
+            payload[k] = os.path.basename(filename)
         else:
             payload[k] = v
     print(payload)
