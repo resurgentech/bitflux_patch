@@ -4,6 +4,8 @@
 import requests
 import glob
 import json
+import os
+import sys
 
 
 def post(input_url, release_type, username, password, config, filename):
