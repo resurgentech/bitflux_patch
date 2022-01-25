@@ -35,7 +35,7 @@ def list_artifacts(config):
     for file in glob.glob(output):
         artifacts.append(file)
     if len(artifacts) == 0:
-        print("Can't find '{}'".format(output))
+        print("Failure: '{}' returns nothing".format(output))
         raise
     return artifacts
 
