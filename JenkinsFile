@@ -1,0 +1,17 @@
+agent {
+	label 'standarddocker'
+}
+
+parameters {
+	credentials credentialType: 'com.cloudbees.plugins.credentials.impl.UsernamePasswordCredentialsImpl', defaultValue: 'nexus_jenkins_login', name: 'NEXUSJENKINS', required: true
+}
+
+timestamps {
+	stages {
+	  stage('BitFlux Patch - Build') {
+	    steps {
+	      sh 'ls -la'
+	    }
+	  }
+	}
+}
