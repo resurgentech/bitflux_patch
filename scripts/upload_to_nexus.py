@@ -31,8 +31,12 @@ def post(input_url, release_type, username, password, config, filename):
 
 def list_artifacts(config):
     artifacts = []
-    for file in glob.glob("output/*.{}".format(config['build_style'])):
+    output = "output/*.{}".format(config['build_style'])
+    for file in glob.glob(output):
         artifacts.append(file)
+    if len(artifacts) == 0:
+        print("Can't find '{}'".format(output))
+        raise
     return artifacts
 
 
