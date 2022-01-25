@@ -7,7 +7,7 @@
       "pkg_filters": ["hwe", "cloud", "dkms", "tools", "buildinfo"],
       "metapkg_template": "linux-image-swaphints"
       "upload": {
-        "repository": "aptRelease",
+        "repository": "apt__RELEASE__",
         "form": {
           "apt.asset": "__FILECONTENTS__"
         }
@@ -23,7 +23,7 @@
     "rockylinux8": {
       "build_style": "rpm",
       "upload": {
-        "repository": "yumRelease",
+        "repository": "yum__RELEASE__",
         "form": {
           "yum.directory": "rocky/8/x86_64/",
           "yum.asset": "__FILECONTENTS__",
