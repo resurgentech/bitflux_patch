@@ -5,7 +5,7 @@
       "image_searchfactors": ["^linux-image-unsigned-", "generic$"],
       "ver_ref_pkg": "linux-image-unsigned",
       "pkg_filters": ["hwe", "cloud", "dkms", "tools", "buildinfo"],
-      "metapkg_template": "linux-image-swaphints"
+      "metapkg_template": "linux-image-swaphints",
       "upload": {
         "repository": "apt__RELEASE__",
         "form": {
