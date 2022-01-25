@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 # Copyright (c) Resurgent Technologies 2021
 
-from kernel_package_builder import *
 import requests
 import glob
+import json
 
 
 def post(input_url, release_type, username, password, config, filename):
@@ -32,6 +32,12 @@ def list_artifacts(config):
     for file in glob.glob("output/*.{}".format(config['build_style'])):
         artifacts.append(file)
     return artifacts
+
+
+def read_json_file(filename):
+    with open(filename, "r") as file:
+        contents = json.load(file)
+    return contents
 
 
 if __name__ == '__main__':
