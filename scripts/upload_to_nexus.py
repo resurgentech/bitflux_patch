@@ -62,7 +62,7 @@ if __name__ == '__main__':
         parser.print_help()
         sys.exit(1)
 
-    if configs['url'] is None:
+    if args.url is None:
         print("You need a URL, --url")
         parser.print_help()
         sys.exit(1)
@@ -70,4 +70,4 @@ if __name__ == '__main__':
     config = configs['distros'][args.distro]
     artifacts = list_artifacts(config)
     for artifact in artifacts:
-        post(configs['url'], args.release_type, args.username, args.password, config, artifact)
+        post(args.url, args.release_type, args.username, args.password, config, artifact)
