@@ -6,6 +6,12 @@
       "ver_ref_pkg": "linux-image-unsigned",
       "pkg_filters": ["hwe", "cloud", "dkms", "tools", "buildinfo"],
       "metapkg_template": "linux-image-swaphints"
+      "upload": {
+        "repository": "aptRelease",
+        "form": {
+          "apt.asset": "__FILECONTENTS__"
+        }
+      }
     },
     "popos2004": {
       "build_style": "deb",
@@ -15,7 +21,15 @@
       "metapkg_template": "linux-image-swaphints"
     },
     "rockylinux8": {
-      "build_style": "rpm"
+      "build_style": "rpm",
+      "upload": {
+        "repository": "yumRelease",
+        "form": {
+          "yum.directory": "rocky/8/x86_64/",
+          "yum.asset": "__FILECONTENTS__",
+          "yum.asset.filename": "__FILENAME__"
+        }
+      }
     },
     "centos8": {
       "build_style": "rpm"
