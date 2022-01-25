@@ -35,13 +35,25 @@ For example, `mm__vmscan_c--__reclaim_page.merge` will merge its contents into t
 #### *.new
 These are generated as patch steps are applied.  `complete.patch.new` is the entire patch set rolled into one patch.
 
-## Scripts
+##build_kernel_package.sh
+This script coordinates several stages involving docker containers and the build_kernel_package.py script to make kernel packages.
+
+## Scripts directory
 This explains the underlying tools and scripts of the project.
+
+### upload_to_nexus.py
+Internal tool used to push output files to our repo mirrors for publication.
+
+### build_kernel_package.py
+Runs the job to build kernel packages inside the environment for each distro.  Either inside a container or machine running the target distro.
+
+### kernel_package_builder
+Overly complicated code used to auto patch and build kernel packages for various distros inside their own environment.
 
 ### docker
 Contains Dockerfiles and scripts for building packages for specific versions.
 
--  **Dockerfile.*** - well you know... Dockerfiles
+- **Dockerfile.*** - well you know... Dockerfiles
 
 - **build.sh** - Builds the images and tags them.
 
@@ -51,9 +63,6 @@ Contains Dockerfiles and scripts for building packages for specific versions.
 
 - **push.sh** - `./scripts/docker/push.sh` uploads docker images, if docker is configured to push to the repo.  Can't remember how that is done.
 
-
-### ansible
-Installer helpers for installing prereqs and packages for installing bitflux.  mostly for testing with vagrant initiated vms but could be used for general installation.
 
 ### vagrant
 Contains config and scripts to make and config vms.
