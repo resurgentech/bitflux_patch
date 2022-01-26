@@ -12,20 +12,24 @@ def post(input_url, release_type, username, password, config, filename):
     url = "{}?repository={}".format(input_url, config['upload']['repository'])
     if "__RELEASE__" in url:
         url = url.replace("__RELEASE__", release_type)
-    headers = {'accept': 'application/json', 'Content-Type': 'multipart/form-data'}
+    ## Not sure whats up with the headers
+    #headers = {'accept': 'application/json', 'Content-Type': 'multipart/form-data'}
+    headers = {}
     payload = {}
     for k, v in config['upload']['form'].items():
         if v == "__FILECONTENTS__":
-            payload[k] = open(filename, 'rb')
+            payload[k] = (filename, open(filename, 'rb'))
         elif v == "__FILENAME__":
-            payload[k] = os.path.basename(filename)
+            payload[k] = (None, os.path.basename(filename))
         else:
-            payload[k] = v
-    print(payload)
-    response = requests.post(url, headers=headers, data=payload, auth=(username, password))
-    if response.status_code != 200:
-        print(response)
-        print("url: {}, headers: {}, form: {}, filename: {}".format(url, headers, config['upload']['form'], filename))
+            payload[k] = (None, v)
+    print("===============================================")
+    print('filename={}'.format(filename))
+    debug = {'url': url, 'headers': headers, 'rawform': config['upload']['form'], 'payload': payload}
+    print(json.dumps(debug, indent=4, default=lambda o: str(o)))
+    response = requests.post(url, headers=headers, files=payload, auth=(username, password))
+    print("response={}".format(response))
+    if response.status_code < 200 and response.status_code >= 300:
         raise
 
 
