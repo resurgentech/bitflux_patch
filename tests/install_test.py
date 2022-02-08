@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # Copyright (c) Resurgent Technologies 2021
 
-from kernel_package_builder.common import *
+from common import *
 import jinja2
 
 
