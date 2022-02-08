@@ -52,10 +52,13 @@ static unsigned long reclaim_page(struct page *p, struct scan_control *sc)
 		spin_unlock_irq(lru_lock);
 		return 0;
 	}
-
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+	if(!__isolate_lru_page_prepare(page, 0)) {
+#else
 	switch (__isolate_lru_page_prepare(page, 0)) {
 	case 0:
+#endif
 		/*
 		 * Be careful not to clear PageLRU until after we're
 		 * sure the page is not being freed elsewhere -- the
@@ -110,8 +113,12 @@ static unsigned long reclaim_page(struct page *p, struct scan_control *sc)
 			putback_lru_page(page);
 		}
 #endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+	} else {
+#else
 		break;
 	default:
+#endif
 		spin_unlock_irq(lru_lock);
 		//printk(KERN_INFO "Error Isolating Page for injected reclaim\n");
 	}

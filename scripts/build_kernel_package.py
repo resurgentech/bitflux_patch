@@ -12,7 +12,7 @@ if __name__ == '__main__':
     parser.add_argument('--kernel_version', help='kernel version', type=str)
     parser.add_argument('--kernel_build_test', help='Hacks for patching and building test', action='store_true')
     default_configfile = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'configs.json')
-    parser.add_argument('--config', help='Path to config file for defaults and such', default=default_configfile, action='store_true')
+    parser.add_argument('--config', help='Path to config file for defaults and such', default=default_configfile, type=str)
     parser.add_argument('--nobuild', help='Don\'t build', action='store_true')
     parser.add_argument('--clean', help='Extra clean up steps', action='store_true')
 
@@ -23,7 +23,7 @@ if __name__ == '__main__':
     if args.kernel_build_test:
         if args.kernel_version is None:
             print("Need kernel_version if kernel_build_test is True")
-            args.print_help()
+            parser.print_help()
             sys.exit(1)
         test_kernel_build(args)
         sys.exit(1)

@@ -62,6 +62,12 @@ def run_cmd(cmd, workingdir=None, allow_errors=False, verbose=False, live_output
     return exitcode, out, err
 
 
+def helper__deepcopy(data):
+    a = json.dumps(data)
+    b = json.loads(a)
+    return b
+
+
 def find_directory(searchdir='./', matchdir=None):
     """
     find sub directory in searchdir, return the expected matchdir, the first subdir (if matchdir is None) or None
