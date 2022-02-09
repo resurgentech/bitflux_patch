@@ -299,6 +299,3 @@ def debian_style_build(args, configs):
     run_cmd("rm -rf ./output;", allow_errors=True)
     copy_outputs("./build/*.deb")
     copy_outputs("{}/*.new".format(patches_dir), outputdir='./output/patches/')
-
-    # Write file for artifactory upload
-    make_artifactory_file_spec(args.distro)

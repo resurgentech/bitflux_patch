@@ -1,7 +1,11 @@
 #!/usr/bin/python3
 # Copyright (c) Resurgent Technologies 2021
-
-from common import *
+import os
+import sys
+# adding scripts to add kernel_package_builder
+scriptspath = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'scripts'))
+sys.path.append(scriptspath)
+from kernel_package_builder.common import *
 import jinja2
 
 
@@ -117,6 +121,7 @@ if __name__ == '__main__':
     parser.add_argument('--key', help='Repo keys', type=str)
     parser.add_argument('--yumrepo', help='Yum repo url', type=str)
     parser.add_argument('--aptrepo', help='apt repo url', type=str)
+    parser.add_argument('--noteardown', help='Don\'t clean up VMs, for debug', action='store_true')
 
     args = parser.parse_args()
 
@@ -153,4 +158,5 @@ if __name__ == '__main__':
     run_tests(configs, args, 10)
 
     # create and start vm
-    #vagrant_tools(configs, args, "vm_teardown.sh")
+    if not args.noteardown:
+        vagrant_tools(configs, args, "vm_teardown.sh")

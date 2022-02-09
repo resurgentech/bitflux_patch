@@ -1,0 +1,25 @@
+diff --git a/include/linux/swap.h b/include/linux/swap.h
+index 6610469..f1664c1 100644
+--- a/include/linux/swap.h
++++ b/include/linux/swap.h
+@@ -357,6 +357,8 @@ extern void lru_cache_add_inactive_or_unevictable(struct page *page,
+ 
+ /* linux/mm/vmscan.c */
+ extern unsigned long zone_reclaimable_pages(struct zone *zone);
++extern int request_reclaim_flusher_wakeup(void);
++extern int inject_reclaim_page(pg_data_t *pgdat, int order, int classzone_idx, struct page *page);
+ extern unsigned long try_to_free_pages(struct zonelist *zonelist, int order,
+ 					gfp_t gfp_mask, nodemask_t *mask);
+ extern int __isolate_lru_page(struct page *page, isolate_mode_t mode);
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 8b11736..7256000 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -3745,6 +3745,7 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int highest_zoneidx)
+ 	return sc.order;
+ }
+ 
++//__reclaim_page.merge//
+ /*
+  * The pgdat->kswapd_highest_zoneidx is used to pass the highest zone index to
+  * be reclaimed by kswapd from the waker. If the value is MAX_NR_ZONES which is
