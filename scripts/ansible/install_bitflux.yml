@@ -1,0 +1,23 @@
+---
+- name: role to install bitflux
+  hosts: all
+  tasks:
+  - name: Download installer
+    get_url:
+      url: "{{ installer_url }}"
+      dest: "/tmp/{{ installer_filename }}"
+      mode: '0777'
+  - name: Install
+    shell: "/tmp/{{ installer_filename }} {{ installer_options }}"
+  - name: Reboot the server
+    shell: "reboot"
+    async: 1
+    poll: 0
+  - name: Wait for the reboot and reconnect
+    wait_for:
+      port: 22
+      host: '{{ (ansible_ssh_host|default(ansible_host))|default(inventory_hostname) }}'
+      search_regex: OpenSSH
+      delay: 10
+      timeout: 60
+    connection: local

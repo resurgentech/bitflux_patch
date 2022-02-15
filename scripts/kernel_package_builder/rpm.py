@@ -243,6 +243,3 @@ def rpm_style_build(args, configs):
     run_cmd("rm -rf ./output;", allow_errors=True)
     copy_outputs("{}/RPMS/x86_64/*.rpm".format(rpm_topdir))
     copy_outputs("{}/*.new".format(patches_dir), outputdir='./output/patches/')
-
-    # Write file for artifactory upload
-    make_artifactory_file_spec(args.distro)

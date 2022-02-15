@@ -55,7 +55,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--distro', help='Linux distro', type=str)
     default_configfile = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'configs.json')
-    parser.add_argument('--config', help='Path to config file for defaults and such', default=default_configfile, action='store_true')
+    parser.add_argument('--config', help='Path to config file for defaults and such', default=default_configfile, type=str)
     parser.add_argument('--url', help='URL for nexus system', type=str)
     parser.add_argument('--release_type', help='Release type for Nexus', type=str)
     parser.add_argument('--username', help='username for Nexus', type=str)

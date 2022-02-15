@@ -62,6 +62,12 @@ def run_cmd(cmd, workingdir=None, allow_errors=False, verbose=False, live_output
     return exitcode, out, err
 
 
+def helper__deepcopy(data):
+    a = json.dumps(data)
+    b = json.loads(a)
+    return b
+
+
 def find_directory(searchdir='./', matchdir=None):
     """
     find sub directory in searchdir, return the expected matchdir, the first subdir (if matchdir is None) or None
@@ -112,41 +118,12 @@ def download_file(url, filepath):
         data = urllib.request.urlopen(url)
         file.write(data.read())
 
-#deprecated...?
-def make_artifactory_file_spec(distro, outputdir='./output'):
-    output = {'files': []}
-    chunk = {}
-    if distro == 'centos8':
-        chunk['pattern'] = "{}/*.rpm".format(outputdir)
-        chunk['target'] = "yum/centos/8/x86_64/"
-    elif distro == 'rockylinux8':
-        chunk['pattern'] = "{}/*.rpm".format(outputdir)
-        chunk['target'] = "yum/rocky/8/x86_64/"
-    elif distro == 'fedora34':
-        chunk['pattern'] = "{}/*.rpm".format(outputdir)
-        chunk['target'] = "yum/fedora/34/x86_64/"
-    elif distro == 'ubuntu2004':
-        chunk['pattern'] = "{}/*.deb".format(outputdir)
-        chunk['target'] = "ubuntu/"
-        chunk['props'] = "deb.distribution=focal;deb.component=main;deb.architecture=amd64"
-    elif distro == 'popos2004':
-        chunk['pattern'] = "{}/*.deb".format(outputdir)
-        chunk['target'] = "pop/"
-        chunk['props'] = "deb.distribution=focal;deb.component=main;deb.architecture=amd64"
-    else:
-        print("unsupported distro = '{}'".format(distro))
-        raise
-    output['files'].append(chunk)
-    json_data = json.dumps(output, indent=4)
-    filepath = "{}/artifactory.json".format(outputdir)
-    with open(filepath, "w") as file:
-        file.write(json_data)
-
 
 def copy_outputs(src, outputdir='./output', verbose=True):
     run_cmd("mkdir -p {};".format(outputdir), allow_errors=True, verbose=verbose)
     for file in glob.glob(src):
         shutil.copy(file, outputdir)
+
 
 def read_json_file(filename):
     with open(filename, "r") as file:

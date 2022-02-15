@@ -50,19 +50,14 @@ Runs the job to build kernel packages inside the environment for each distro.  E
 ### kernel_package_builder
 Overly complicated code used to auto patch and build kernel packages for various distros inside their own environment.
 
+### ansible
+ansible playbook that installs bitflux.
+
 ### docker
-Contains Dockerfiles and scripts for building packages for specific versions.
+Contains Dockerfiles and scripts for building packages for specific distros.
 
 - **Dockerfile.*** - well you know... Dockerfiles
-
-- **build.sh** - Builds the images and tags them.
-
-- **run_kernel_test.sh** - `./scripts/docker/run_kernel_test.sh 5.8.18` this will patch and build a vanilla kernel.  For testing the patch set.
-
 - **run.sh** - `./scripts/docker/run.sh ubuntu2004` helper to start a bash shell in a container.
-
-- **push.sh** - `./scripts/docker/push.sh` uploads docker images, if docker is configured to push to the repo.  Can't remember how that is done.
-
 
 ### vagrant
 Contains config and scripts to make and config vms.
@@ -71,6 +66,8 @@ Contains config and scripts to make and config vms.
 
 - **teardown.sh** - `./scripts/vagrant/teardown.sh centos8`  will destroy the vm created with setup.sh.
 
+## tests directory
+Contains code and config required to run automated tests against kernel packages with bitflux.
 
 # Build Notes
 - 5.13.19 - patches and builds

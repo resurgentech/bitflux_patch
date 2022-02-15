@@ -1,0 +1,68 @@
+machines:
+  path: "machines"
+  vagrant_provider: libvirt
+  list:
+    {{ machine_name }}:
+      vagrant:
+        memory: 4000
+        cpus: 2
+        disksize: 64GB
+      machine_template: {{ machine_template }}
+machine_templates:
+  ubuntu2004_server:
+    vagrant:
+      box: jaredeh/ubuntu2004-server
+    ansible:
+      ansible_user: vagrant
+      ansible_password: vagrant
+      ansible_become: true
+  rockylinux85minimal:
+    vagrant:
+      box: rockylinux85minimal
+    ansible:
+      ansible_user: vagrant
+      ansible_password: vagrant
+      ansible_become: true
+  rockylinux85:
+    vagrant:
+      box: jaredeh/rockylinux85
+    ansible:
+      ansible_user: vagrant
+      ansible_password: vagrant
+      ansible_become: true
+  popos2110:
+    vagrant:
+      box: jaredeh/popos2110
+    ansible:
+      ansible_user: vagrant
+      ansible_password: vagrant
+      ansible_become: true
+  popos2004:
+    vagrant:
+      box: jaredeh/popos2004
+    ansible:
+      ansible_user: vagrant
+      ansible_password: vagrant
+      ansible_become: true
+vagrantfile_templates:
+  default:
+    "# -*- mode: ruby -*-\n
+    # vi: set ft=ruby :\n
+    Vagrant.configure(\"2\") do |config|\n
+     \thostname = \"{hostname}\"\n
+     \tlocale = \"en_US.UTF.8\"\n
+     \t# Box\n
+     \tconfig.vm.box = \"{box}\"\n
+     \tconfig.vm.disk :disk, size: \"{disksize}\", primary: true\n
+     \tconfig.vm.synced_folder \".\", \"/vagrant\", disabled: true\n
+     \tconfig.vm.provider \"libvirt\" do |v|\n
+     \t\tv.memory = {memory}\n
+     \t\tv.cpus = {cpus}\n
+     \tend\n
+     \tconfig.vm.provision \"shell\", inline: <<-SHELL\n
+     \techo \"vagrant ALL=(ALL) NOPASSWD: ALL\" > /etc/sudoers.d/vagrant\n
+     \tchmod 0440 /etc/sudoers.d/vagrant\n
+     \tSHELL\n
+     end"
+children:
+  duh:
