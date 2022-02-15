@@ -10,7 +10,7 @@ if __name__ == '__main__':
     parser.add_argument('--distro', help='Linux distro', type=str)
     parser.add_argument('--buildnumber', help='Adds to package name to increment it', type=str)
     parser.add_argument('--kernel_version', help='kernel version', type=str)
-    parser.add_argument('--build_type', help='Hacks for patching and building test', default='distro', type=str)
+    parser.add_argument('--build_type', help='Hacks for patching and building test [distro, file, git]', default='distro', type=str)
     default_configfile = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'configs.json')
     parser.add_argument('--config', help='Path to config file for defaults and such', default=default_configfile, type=str)
     parser.add_argument('--nobuild', help='Don\'t build', action='store_true')

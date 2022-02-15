@@ -56,7 +56,14 @@ def test_git_build(args):
     # We're going to build ubuntu debs
     run_cmd("cp /boot/config-$(uname -r) .config", workingdir=src_dir, allow_errors=False, verbose=True)
     run_cmd("make olddefconfig", workingdir=src_dir, allow_errors=False, verbose=True)
+    run_cmd("./scripts/config --disable SYSTEM_TRUSTED_KEYS", workingdir=src_dir, allow_errors=False, verbose=True)
+    run_cmd("./scripts/config --disable SYSTEM_REVOCATION_KEYS", workingdir=src_dir, allow_errors=False, verbose=True)
     exitcode, _, _ = run_cmd("make -j $(nproc) deb-pkg LOCALVERSION=-custom", workingdir=src_dir, allow_errors=True, live_output=True, verbose=True)
     if exitcode != 0:
         # If make dies run it single threaded to make debug easier
         run_cmd("make", workingdir=src_dir, allow_errors=True, verbose=True, live_output=True)
+
+    # Copy outputs
+    run_cmd("rm -rf ./output;", allow_errors=True)
+    copy_outputs("./build/*.deb")
+    copy_outputs("{}/*.new".format(patches_dir), outputdir='./output/patches/')

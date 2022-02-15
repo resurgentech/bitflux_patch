@@ -1,27 +1,29 @@
 #!/bin/bash
 # Copyright (c) Resurgent Technologies 2021
 
+# Good for building a specific version of the mainline kernel
+
 DIR="$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-cd ${DIR}
+cd ${DIR}/..
 
 SCRIPTNAME="$( basename "${BASH_SOURCE[0]}")"
 
-if [ $# -lt 3 ]; then
-  echo "USAGE: ${SCRIPTNAME} <DISTRO> <JOBNAME> <BUILDNUMBER>"
+if [ $# -lt 2 ]; then
+  echo "USAGE: ${SCRIPTNAME} <DISTRO> <KERNEL_VERSION>"
   echo "---- args: $@"
   exit 1
 fi
 
 DISTRO=$1
-LJOB=$2
-LBUILDNUM=$3
+KERNEL_VERSION=$2
+LJOB="build_kernel_file"
 # hack for testing
-NOBUILD=$4
+DUMPALL=$3
 
 IMAGENAME="resurgentech_local/${LJOB}:latest"
 CONTAINERNAME="${LJOB}"
 
-echo "Running \"${SCRIPTNAME} ${DISTRO} ${LJOB} ${LBUILDNUM}\""
+echo "Running \"${SCRIPTNAME} ${DISTRO} ${LJOB}\""
 echo "    Docker image name =${IMAGENAME}"
 echo "    Container name    =${CONTAINERNAME}"
 
@@ -35,22 +37,23 @@ docker build -f Dockerfile.${DISTRO} . --tag ${IMAGENAME}
 rm Dockerfile.${DISTRO}
 
 # Build Kernel
-if [ -z $NOBUILD ]; then
-  echo ""
-else
-  echo "Not building per your request"
-  exit 0
-fi
 echo "=============================================================================="
 echo "=== BUILD KERNEL PACKAGE ====================================================="
 echo "=============================================================================="
-docker run --privileged --name ${CONTAINERNAME} ${IMAGENAME} python3 ./scripts/build_kernel_package.py --distro ${DISTRO} --buildnumber ${LBUILDNUM}
+docker run --privileged --name ${CONTAINERNAME} ${IMAGENAME} python3 ./scripts/build_kernel_package.py --distro ${DISTRO} --kernel_version ${KERNEL_VERSION} --build_type file
 
 # Pull output
 echo "=============================================================================="
 echo "=== COPY OUTPUT FROM CONTAINER ==============================================="
 echo "=============================================================================="
-docker cp ${CONTAINERNAME}:/bitflux/output .
+if [ -z $DUMPALL ]; then
+  docker cp ${CONTAINERNAME}:/bitflux/output .
+else
+  rm -rf dumpall
+  mkdir dumpall
+  docker cp ${CONTAINERNAME}:/bitflux/ dumpall
+fi
+
 
 # Clean
 echo "=============================================================================="

@@ -41,13 +41,15 @@ def download_rpm_kernel(build_dir, kernel_version, clean):
     rpm_upack_srpm(srpm_filename, allow_errors=False, verbose=False, builddir=build_dir)
     # find tarball
     tarball_filepath = dnf_get_kernel_tarball(srpm_filename, srpm_unpacked_dir, allow_errors=False, verbose=False)
+    # get .config
+    rpm_config = os.path.join(srpm_unpacked_dir, 'SOURCES', 'kernel-x86_64.config')
     filename = os.path.basename(tarball_filepath)
     filepath = os.path.join(build_dir, filename)
     src_dir = filepath.split('.tar.xz')[0]
     print("Found kernel src directory: {}".format(src_dir))
     run_cmd("rm -rf {}".format(src_dir), verbose=False)
     shutil.copyfile(tarball_filepath, filepath)
-    return filename, filepath, src_dir
+    return filename, filepath, src_dir, rpm_config
 
 
 def test_kernel_build(args):
@@ -60,13 +62,15 @@ def test_kernel_build(args):
 
     # Get tarball
     if 'rpm' in kernel_version:
-        filename, filepath, src_dir = download_rpm_kernel(build_dir, kernel_version, args.clean)
+        filename, filepath, src_dir, rpm_config = download_rpm_kernel(build_dir, kernel_version, args.clean)
     else:
         filename, filepath, src_dir = download_mainline_kernel(build_dir, kernel_version, args.clean)
 
     # Untar tarball
     run_cmd("tar xf {}".format(filename), workingdir=build_dir, verbose=False)
-
+    if rpm_config is not None:
+        # rpm crap doesn't build unless you start with their .config
+        shutil.copyfile(rpm_config, os.path.join(src_dir,'.config'))
     # Match up the patch directory
     patches_dir = select_patches_dir(filename, verbose=True)
     print("Found patches directory:    {}".format(patches_dir))
@@ -88,7 +92,7 @@ def test_kernel_build(args):
     # Run kernel build
     if args.nobuild:
         return
-    run_cmd("make defconfig", workingdir=src_dir, allow_errors=False, verbose=True)
+    run_cmd("make olddefconfig", workingdir=src_dir, allow_errors=False, verbose=True)
     run_cmd("./scripts/config --enable TRANSPARENT_HUGEPAGE", workingdir=src_dir, allow_errors=False, verbose=True)
     run_cmd("./scripts/config --enable TRANSPARENT_HUGEPAGE_ALWAYS", workingdir=src_dir, allow_errors=False, verbose=True)
     run_cmd("./scripts/config --enable TRANSPARENT_HUGEPAGE_MADVISE", workingdir=src_dir, allow_errors=False, verbose=True)
