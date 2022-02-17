@@ -34,6 +34,8 @@ echo "=== BUILD DOCKER IMAGE ===================================================
 echo "=============================================================================="
 cp ./scripts/docker/Dockerfile.${DISTRO} .
 docker pull resurgentech/kernel_build-${DISTRO}:latest
+docker rm --force ${CONTAINERNAME}
+docker rmi --force ${IMAGENAME}
 docker build -f Dockerfile.${DISTRO} . --tag ${IMAGENAME}
 rm Dockerfile.${DISTRO}
 

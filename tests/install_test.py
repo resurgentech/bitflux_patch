@@ -22,10 +22,10 @@ def vagrant_tools(configs, args, script):
     run_cmd(cmd, live_output=True)
 
 
-def ansible_install(configs, args, installer_config, installer_options):
+def ansible_install(configs, script, args, installer_config, installer_options, verbosity):
     ansible_dir = configs['ansible_dir']
     invfile = os.path.join(configs['vagrant_dir'], "inventory.yaml")
-    playbook = os.path.join(ansible_dir, "install_bitflux.yml")
+    playbook = os.path.join(ansible_dir, script)
     # formating parameters for installer
     options = ""
     for k,v in installer_options.items():
@@ -36,7 +36,7 @@ def ansible_install(configs, args, installer_config, installer_options):
     installer_config['installer_options'] = options
     # lets escape this structure
     ic = json.dumps(json.dumps(installer_config))
-    cmd = "cd {}; ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i {} {} --extra-vars {}".format(ansible_dir, invfile, playbook, ic)
+    cmd = "cd {}; ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i {} {} --extra-vars {} {}".format(ansible_dir, invfile, playbook, ic, verbosity)
     run_cmd(cmd, live_output=True)
 
 
@@ -66,7 +66,7 @@ def swapping(configs, args):
         print("exitcode: {}".format(exitcode))
         print("stdout: '{}'".format(out))
         print("stderr: '{}'".format(err))
-        return 1
+        return 0
     swaptotal = 0
     swapfree = 0
     for l in out.splitlines():
@@ -76,37 +76,30 @@ def swapping(configs, args):
         elif b[0] == 'SwapFree:':
             swapfree = int(b[1])
     swapped = swaptotal - swapfree
-    if swapped < 50000:
+    # Do we see any pages swapped we'll settle for 500K
+    if swapped < 500:
         print("swapped: {} swaptotal: {} swapfree: {}".format(swapped, swaptotal, swapfree))
         print("stdout: '{}'".format(out))
         print("stderr: '{}'".format(err))
-        return 1
-    return 0
-
-# cd machines/name
-# ansible 
-# - dl installer  (make path configurable)
-# - run install (variable options?)
-# - reboot
-# - wait
-# using ssh?
-# - check kernel
-# - look for savings in log
-# 
+        return 0
+    return 1
 
 
 def run_tests(configs, args, loops):
     # check if kernel module loads
     if check_for_swaphints(configs, args):
-        print("=========FAILED SWAPHINTS CHECK=================================")
+        print("----------------FAILED SWAPHINTS CHECK-----------------------------")
         return 1
+    print("++++++++++++++++PASSED SWAPHINTS CHECK++++++++++++++++++++++++++++")
 
-    # Loop until timing out or pasing
+    # Loop until timing out or we detect swapped pages
     for i in range(loops):
         sleep(60)
-        if not swapping(configs, args):
+        passed = swapping(configs, args)
+        if passed:
+            print("++++++++++++++++PASSED SWAPPING CHECK++++++++++++++++++++++++++++")
             return 0
-    print("=========FAILED SWAPPING CHECK=================================")
+    print("----------------FAILED SWAPPING CHECK-----------------------------")
     return 1
 
 
@@ -121,7 +114,13 @@ if __name__ == '__main__':
     parser.add_argument('--key', help='Repo keys', type=str)
     parser.add_argument('--yumrepo', help='Yum repo url', type=str)
     parser.add_argument('--aptrepo', help='apt repo url', type=str)
+    parser.add_argument('--license', help='license for bitflux', type=str)
+    parser.add_argument('--deviceid', help='deviceid for bitflux', type=str)
     parser.add_argument('--noteardown', help='Don\'t clean up VMs, for debug', action='store_true')
+    parser.add_argument('--no_grub_update', help='Don\'t tweak grub', action='store_true')
+    parser.add_argument('--manual_modprobe', help='Force modprobe in script rather than relying on the system settings.', action='store_true')
+    parser.add_argument('--verbosity', help='verbose mode for ansible ex. -vvv', default='', type=str)
+    parser.add_argument('--tarballkernel', help='Install kernel from tarball from minio', type=str)
 
     args = parser.parse_args()
 
@@ -150,13 +149,32 @@ if __name__ == '__main__':
         installer_options['overrides']['yum_repo_baseurl'] = args.key
     if args.aptrepo is not None:
         installer_options['overrides']['apt_repo_url'] = args.key
+    if args.tarballkernel is not None:
+        installer_options['nokernel'] = ''
+        installer_config['tarball'] = args.tarballkernel
+    if args.license is not None:
+        installer_options['license'] = args.license
+    if args.deviceid is not None:
+        installer_options['deviceid'] = args.deviceid
+    if args.no_grub_update is None:
+        installer_options['grub_update'] = ''
+
+    # Runs script with ansible to install bitflux to
+    if args.tarballkernel is not None:
+        run_cmd("mc cp {} latest.tar.gz".format(args.tarballkernel))
+        ansible_install(configs, "install_tarballkernel.yml", args, installer_config, installer_options, args.verbosity)
 
     # Runs script with ansible to install bitflux to 
-    ansible_install(configs, args, installer_config, installer_options)
+    ansible_install(configs, "install_bitflux.yml", args, installer_config, installer_options, args.verbosity)
+
+    if args.manual_modprobe:
+        do_ansible_adhoc(configs, args, "sudo modprobe swaphints")
 
     # Testing
-    run_tests(configs, args, 10)
+    retval = run_tests(configs, args, 10)
 
     # create and start vm
     if not args.noteardown:
         vagrant_tools(configs, args, "vm_teardown.sh")
+
+    sys.exit(retval)
