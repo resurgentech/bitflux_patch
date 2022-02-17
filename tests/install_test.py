@@ -76,23 +76,13 @@ def swapping(configs, args):
         elif b[0] == 'SwapFree:':
             swapfree = int(b[1])
     swapped = swaptotal - swapfree
+    # Do we see any pages swapped we'll settle for 500K
     if swapped < 500:
         print("swapped: {} swaptotal: {} swapfree: {}".format(swapped, swaptotal, swapfree))
         print("stdout: '{}'".format(out))
         print("stderr: '{}'".format(err))
         return 0
     return 1
-
-# cd machines/name
-# ansible 
-# - dl installer  (make path configurable)
-# - run install (variable options?)
-# - reboot
-# - wait
-# using ssh?
-# - check kernel
-# - look for savings in log
-# 
 
 
 def run_tests(configs, args, loops):
@@ -102,7 +92,7 @@ def run_tests(configs, args, loops):
         return 1
     print("++++++++++++++++PASSED SWAPHINTS CHECK++++++++++++++++++++++++++++")
 
-    # Loop until timing out or pasing
+    # Loop until timing out or we detect swapped pages
     for i in range(loops):
         sleep(60)
         passed = swapping(configs, args)
@@ -168,7 +158,6 @@ if __name__ == '__main__':
         installer_options['deviceid'] = args.deviceid
     if args.no_grub_update is None:
         installer_options['grub_update'] = ''
-
 
     # Runs script with ansible to install bitflux to
     if args.tarballkernel is not None:
