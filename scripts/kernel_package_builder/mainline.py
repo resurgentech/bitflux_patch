@@ -65,6 +65,7 @@ def test_kernel_build(args):
         filename, filepath, src_dir, rpm_config = download_rpm_kernel(build_dir, kernel_version, args.clean)
     else:
         filename, filepath, src_dir = download_mainline_kernel(build_dir, kernel_version, args.clean)
+        rpm_config = None
 
     # Untar tarball
     run_cmd("tar xf {}".format(filename), workingdir=build_dir, verbose=False)
@@ -96,6 +97,9 @@ def test_kernel_build(args):
     run_cmd("./scripts/config --enable TRANSPARENT_HUGEPAGE", workingdir=src_dir, allow_errors=False, verbose=True)
     run_cmd("./scripts/config --enable TRANSPARENT_HUGEPAGE_ALWAYS", workingdir=src_dir, allow_errors=False, verbose=True)
     run_cmd("./scripts/config --enable TRANSPARENT_HUGEPAGE_MADVISE", workingdir=src_dir, allow_errors=False, verbose=True)
+    run_cmd("./scripts/config --disable SYSTEM_TRUSTED_KEYS", workingdir=src_dir, allow_errors=False, verbose=True)
+    run_cmd("./scripts/config --disable SYSTEM_REVOCATION_KEYS", workingdir=src_dir, allow_errors=False, verbose=True)
+    run_cmd("make olddefconfig", workingdir=src_dir, allow_errors=False, verbose=True)
     exitcode, _, _ = run_cmd("make -j $(nproc)", workingdir=src_dir, allow_errors=True, live_output=True, verbose=True)
     if exitcode != 0:
         # If make dies run it single threaded to make debug easier
