@@ -114,7 +114,11 @@ extern int inject_reclaim_page(pg_data_t *pgdat, int order, int classzone_idx,
 	 * Begin necessary node isolation
 	 */
 	set_task_reclaim_state(current, &sc.reclaim_state);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+	__fs_reclaim_acquire(_THIS_IP_);
+#else
 	__fs_reclaim_acquire();
+#endif
 	count_vm_event(PAGEOUTRUN);
 
 	/* We don't want to alter watermarks at all, we just want to
@@ -168,7 +172,11 @@ extern int inject_reclaim_page(pg_data_t *pgdat, int order, int classzone_idx,
 	 * Undo all node isolation
 	 */
 	snapshot_refaults(NULL, pgdat);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+	__fs_reclaim_release(_THIS_IP_);
+#else
 	__fs_reclaim_release();
+#endif
 	set_task_reclaim_state(current, NULL);
 
 	return nr_reclaimed;
