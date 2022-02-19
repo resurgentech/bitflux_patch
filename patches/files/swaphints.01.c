@@ -19,6 +19,10 @@
 #include <linux/uaccess.h>
 #include <linux/version.h>
 #include <linux/writeback.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
+#include <linux/slab.h>
+#endif
+
 
 MODULE_DESCRIPTION("Proc File Enabled Swap Hint Handler.");
 #define VERSION_NUMBER "0.62"
