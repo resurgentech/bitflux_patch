@@ -23,17 +23,25 @@ static unsigned long reclaim_page(struct page *p, struct scan_control *sc)
 	enum lru_list srclruid;
 	unsigned int nr_pages = 0;
 	pgdat = page_pgdat(page);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
+	lruvec = folio_lruvec(page_folio(page));
+#else
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0)
 	lruvec = mem_cgroup_page_lruvec(page);
 #else
 	lruvec = mem_cgroup_page_lruvec(page, pgdat);
+#endif
 #endif
 	lru_lock = &lruvec->lru_lock;
 	srclruptr = &page->lru;
 	INIT_LIST_HEAD(&node_page_list);
 
 	spin_lock_irq(lru_lock);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
+	srclruid = folio_lru_list(page_folio(page));
+#else
 	srclruid = page_lru(page);
+#endif
 	pagezoneid = (unsigned int)page_zonenum(page);
 	nr_pages = compound_nr(page);
 
