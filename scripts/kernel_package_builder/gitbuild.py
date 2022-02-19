@@ -58,6 +58,7 @@ def test_git_build(args):
     run_cmd("make olddefconfig", workingdir=src_dir, allow_errors=False, verbose=True)
     run_cmd("./scripts/config --disable SYSTEM_TRUSTED_KEYS", workingdir=src_dir, allow_errors=False, verbose=True)
     run_cmd("./scripts/config --disable SYSTEM_REVOCATION_KEYS", workingdir=src_dir, allow_errors=False, verbose=True)
+    run_cmd("make olddefconfig", workingdir=src_dir, allow_errors=False, verbose=True)
     exitcode, _, _ = run_cmd("make -j $(nproc) deb-pkg LOCALVERSION=-custom", workingdir=src_dir, allow_errors=True, live_output=True, verbose=True)
     if exitcode != 0:
         # If make dies run it single threaded to make debug easier
