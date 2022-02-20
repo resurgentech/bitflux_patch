@@ -234,6 +234,24 @@ def build_meta_pkg(ver_ref_pkg, pkg_filters, metapkg_template, allow_errors=Fals
     run_cmd("equivs-build {}".format(metapkg_template), workingdir="./build", allow_errors=allow_errors, verbose=verbose)
 
 
+# Find package without building
+def get_package_deb(args, configs):
+    config = configs['distros'][args.distro]
+    image_searchfactors = config['image_searchfactors']
+
+    # Update and upgrade apt repos to latest
+    apt_update_upgrade(allow_errors=True, live_output=False)
+    print("apt repos updated and upgraded")
+    sys.stdout.flush()
+    sleep(3)
+
+    # Return the newest latest linux kernel image package name
+    image_name = apt_get_linux_image_name(image_searchfactors, verbose=False)
+    print("Found image name:           {}".format(image_name))
+    sys.stdout.flush()
+    return image_name
+
+
 def debian_style_build(args, configs):
 
     config = configs['distros'][args.distro]
