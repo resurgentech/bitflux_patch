@@ -184,6 +184,20 @@ def generate_srpm_config_local(bitflux_version, pkg_release, patchfile_path, rpm
                 run_cmd(cmd, allow_errors=allow_errors, verbose=verbose)
 
 
+def get_package_dnf(args, configs):
+    # Update and upgrade apt repos to latest
+    dnf_update_upgrade(allow_errors=True, live_output=False)
+    print("rpm repos updated and upgraded")
+    sys.stdout.flush()
+    sleep(2)
+
+    srpm_filename = dnf_get_srpm(None, args.distro, allow_errors=False, verbose=False)
+    print("Found srpm name:            {}".format(srpm_filename))
+    sys.stdout.flush()
+    sleep(2)
+    return srpm_filename
+
+
 def rpm_style_build(args, configs):
     # Update and upgrade apt repos to latest
     dnf_update_upgrade(allow_errors=True, live_output=False)
