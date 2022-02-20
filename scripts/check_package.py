@@ -24,6 +24,5 @@ if __name__ == '__main__':
     print()
     print("package={}".format(image_name))
     with open("package.yaml", "w") as file:
-        file.write("---")
-        file.write("package: {}".format(image_name))
-        file.write("")
+        file.write("---\n")
+        file.write("package: {}\n".format(image_name))
