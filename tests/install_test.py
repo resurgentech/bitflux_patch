@@ -113,7 +113,9 @@ if __name__ == '__main__':
     parser.add_argument('--machine_name', help='name for vagrant_tools to give new vm', type=str)
     parser.add_argument('--key', help='Repo keys', type=str)
     parser.add_argument('--yumrepo', help='Yum repo url', type=str)
+    parser.add_argument('--yumrepokernel', help='Yum repo for kernel url', type=str)
     parser.add_argument('--aptrepo', help='apt repo url', type=str)
+    parser.add_argument('--aptrepokernel', help='apt repo for kernel url', type=str)
     parser.add_argument('--license', help='license for bitflux', type=str)
     parser.add_argument('--deviceid', help='deviceid for bitflux', type=str)
     parser.add_argument('--noteardown', help='Don\'t clean up VMs, for debug', action='store_true')
@@ -145,13 +147,6 @@ if __name__ == '__main__':
     installer_options = helper__deepcopy(configs['installer_options'])
     if args.key is not None:
         installer_options['overrides']['bitflux_key_url'] = args.key
-    if args.yumrepo is not None:
-        installer_options['overrides']['yum_repo_baseurl'] = args.key
-    if args.aptrepo is not None:
-        installer_options['overrides']['apt_repo_url'] = args.key
-    if args.tarballkernel is not None:
-        installer_options['nokernel'] = ''
-        installer_config['tarball'] = args.tarballkernel
     if args.license is not None:
         installer_options['license'] = args.license
     if args.deviceid is not None:
@@ -159,10 +154,29 @@ if __name__ == '__main__':
     if args.no_grub_update is None:
         installer_options['grub_update'] = ''
 
-    # Runs script with ansible to install bitflux to
     if args.tarballkernel is not None:
+        # Runs script with ansible to install kernel with a tarball
+        installer_options['nokernel'] = ''
+        installer_config['tarball'] = args.tarballkernel
         run_cmd("mc cp {} latest.tar.gz".format(args.tarballkernel))
         ansible_install(configs, "install_tarballkernel.yml", args, installer_config, installer_options, args.verbosity)
+    elif args.aptrepokernel is not None:
+        # Runs script with ansible to install kernel via apt repo
+        installer_options['overrides']['apt_repo_url'] = args.aptrepokernel
+        ansible_install(configs, "install_bitflux.yml", args, installer_config, installer_options, args.verbosity)
+        # Set options to install collector in next round
+        installer_options['nokernel'] = ''
+    elif args.yumrepokernel is not None:
+        # Runs script with ansible to install kernel via apt repo
+        installer_options['overrides']['yum_repo_baseurl'] = args.yumrepokernel
+        ansible_install(configs, "install_bitflux.yml", args, installer_config, installer_options, args.verbosity)
+        # Set options to install collector in next round
+        installer_options['nokernel'] = ''
+
+    if args.yumrepo is not None:
+        installer_options['overrides']['yum_repo_baseurl'] = args.yumrepo
+    if args.aptrepo is not None:
+        installer_options['overrides']['apt_repo_url'] = args.aptrepo
 
     # Runs script with ansible to install bitflux to 
     ansible_install(configs, "install_bitflux.yml", args, installer_config, installer_options, args.verbosity)
