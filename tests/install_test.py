@@ -22,22 +22,33 @@ def vagrant_tools(configs, args, script):
     run_cmd(cmd, live_output=True)
 
 
-def ansible_install(configs, script, args, installer_config, installer_options, verbosity):
+def do_ansible(configs, script, args, extravars=None, interpreter=None):
     ansible_dir = configs['ansible_dir']
     invfile = os.path.join(configs['vagrant_dir'], "inventory.yaml")
     playbook = os.path.join(ansible_dir, script)
-    # formating parameters for installer
+    cmd = "cd {};".format(ansible_dir)
+    cmd += " ANSIBLE_HOST_KEY_CHECKING=False"
+    cmd += " ansible-playbook -i {} {}".format(invfile, playbook)
+    if interpreter is not None:
+        cmd += " --extra-vars ansible_python_interpreter={}".format(interpreter)
+    if extravars is not None:
+        cmd += " --extra-vars {}".format(extravars)
+    cmd += " {}".format(args.verbosity)
+    run_cmd(cmd, live_output=True)
+
+
+def ansible_bitflux_install(configs, script, args, installer_config, installer_options, interpreter='python3'):
+    # formating parameters for bitflux installer
     options = ""
     for k,v in installer_options.items():
         if k == "overrides":
-            options += " --{} \"{}\"".format(k, json.dumps(v))
+            options += " --{} {}".format(k, json.dumps(json.dumps(v)))
             continue
         options += " --{} {}".format(k, v)
     installer_config['installer_options'] = options
-    # lets escape this structure
+    # lets escape this structure for the command line
     ic = json.dumps(json.dumps(installer_config))
-    cmd = "cd {}; ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i {} {} --extra-vars {} {}".format(ansible_dir, invfile, playbook, ic, verbosity)
-    run_cmd(cmd, live_output=True)
+    do_ansible(configs, script, args, extravars=ic, interpreter=interpreter)
 
 
 def do_ansible_adhoc(configs, args, adhoc_cmd):
@@ -154,22 +165,25 @@ if __name__ == '__main__':
     if args.no_grub_update is None:
         installer_options['grub_update'] = ''
 
+    # Some target machines don't have python installed
+    do_ansible(configs, "install_python3.yml", args)
+
     if args.tarballkernel is not None:
         # Runs script with ansible to install kernel with a tarball
         installer_options['nokernel'] = ''
         installer_config['tarball'] = args.tarballkernel
         run_cmd("mc cp {} latest.tar.gz".format(args.tarballkernel))
-        ansible_install(configs, "install_tarballkernel.yml", args, installer_config, installer_options, args.verbosity)
+        ansible_bitflux_install(configs, "install_tarballkernel.yml", args, installer_config, installer_options)
     elif args.aptrepokernel is not None:
         # Runs script with ansible to install kernel via apt repo
         installer_options['overrides']['apt_repo_url'] = args.aptrepokernel
-        ansible_install(configs, "install_bitflux.yml", args, installer_config, installer_options, args.verbosity)
+        ansible_bitflux_install(configs, "install_bitflux.yml", args, installer_config, installer_options)
         # Set options to install collector in next round
         installer_options['nokernel'] = ''
     elif args.yumrepokernel is not None:
         # Runs script with ansible to install kernel via apt repo
         installer_options['overrides']['yum_repo_baseurl'] = args.yumrepokernel
-        ansible_install(configs, "install_bitflux.yml", args, installer_config, installer_options, args.verbosity)
+        ansible_bitflux_install(configs, "install_bitflux.yml", args, installer_config, installer_options)
         # Set options to install collector in next round
         installer_options['nokernel'] = ''
 
@@ -179,7 +193,7 @@ if __name__ == '__main__':
         installer_options['overrides']['apt_repo_url'] = args.aptrepo
 
     # Runs script with ansible to install bitflux to 
-    ansible_install(configs, "install_bitflux.yml", args, installer_config, installer_options, args.verbosity)
+    ansible_bitflux_install(configs, "install_bitflux.yml", args, installer_config, installer_options)
 
     if args.manual_modprobe:
         do_ansible_adhoc(configs, args, "sudo modprobe swaphints")

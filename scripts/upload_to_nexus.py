@@ -29,7 +29,7 @@ def post(input_url, release_type, username, password, config, filename):
     print(json.dumps(debug, indent=4, default=lambda o: str(o)))
     response = requests.post(url, headers=headers, files=payload, auth=(username, password))
     print("response={}".format(response))
-    if response.status_code < 200 and response.status_code >= 300:
+    if response.status_code < 200 or response.status_code >= 300:
         raise
 
 
