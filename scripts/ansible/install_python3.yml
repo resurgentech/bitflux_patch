@@ -1,0 +1,8 @@
+---
+- name: role to install bitflux
+  hosts: all
+  tasks:
+  - name: TEMP - ensure python is installed
+    package:
+      name: python3
+      state: present
