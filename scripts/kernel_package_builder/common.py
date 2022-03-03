@@ -7,11 +7,58 @@ import sys
 import glob
 import shutil
 import json
+import pty
+import select
+import errno
 import urllib.request
 from time import sleep
 
 
-def run_cmd(cmd, workingdir=None, allow_errors=False, verbose=False, live_output=False):
+def make_str(data):
+    if isinstance(data, str):
+        output = data
+    elif isinstance(data, bytes):
+        output = data.decode('utf-8')
+    else:
+        output = str(data)
+    return output
+
+
+def run_system(cmd, workingdir=None, allow_errors=False, verbose=False):
+    """
+    Like run_cmd only runs os.system which takes over the execution
+    """
+    if workingdir is not None:
+        acmd = "cd {}; {}".format(workingdir, cmd)
+    else:
+        acmd = cmd
+    # Not sure how else to get exit code with os.system() call
+    acmd += "{}; echo \"$?\" > os_system.exitcode".format(acmd)
+    if verbose:
+        print("cmd: {}".format(acmd))
+    # Actually run the command
+    os.system(acmd)
+    # Lets get the exitcode from the disk
+    if workingdir is not None:
+        exitcode_path = os.path.join(workingdir, 'os_system.exitcode')
+    else:
+        exitcode_path = 'os_system.exitcode'
+    with open(exitcode_path, 'r') as file:
+        exitcode = int(file.read())
+    if verbose:
+        print("exitcode: {}".format(exitcode))
+        print("")
+    if allow_errors is False and exitcode != 0:
+        if not verbose:
+            print("cmd: {}".format(acmd))
+            print("exitcode: {}".format(exitcode))
+            print("")
+        raise
+    sys.stdout.flush()
+    return exitcode
+
+
+def run_cmd(cmd, shell=True, workingdir=None, allow_errors=False, verbose=False, live_output=False):
     """
     run a command in the shell
 
@@ -25,41 +72,65 @@ def run_cmd(cmd, workingdir=None, allow_errors=False, verbose=False, live_output
     aout = []
     aerr = []
     if workingdir is not None:
-        acmd = "cd {}; {}".format(workingdir, cmd)
-    else:
-        acmd = cmd
-    with subprocess.Popen(acmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1, universal_newlines=True) as p:
-        for line in p.stdout:
-            if live_output:
-                print(line, end='')
-                sys.stdout.flush()
-            aout.append(line)
-        for line in p.stderr:
-            if live_output:
-                print(line, end='')
-                sys.stdout.flush()
-            aerr.append(line)
-    exitcode = p.returncode
-    out = "".join(aout)
-    err = "".join(aerr)
+        cmd = "cd {}; {}".format(workingdir, cmd)
+        shell = True
+    sources, replicas = zip(pty.openpty(), pty.openpty())
     if verbose:
-        print("cmd: {}".format(acmd))
-    if verbose and not live_output:
+        print("cmd: {}".format(cmd))
+    if not shell and isinstance(cmd, str):
+        cmd = cmd.split()
+    with subprocess.Popen(cmd, shell=shell, stdin=replicas[0], stdout=replicas[0], stderr=replicas[1]) as p:
+        for fd in replicas:
+            os.close(fd)
+            readable = {
+                sources[0]: sys.stdout.buffer,
+                sources[1]: sys.stderr.buffer,
+            }
+        while readable:
+            for fd in select.select(readable, [], [])[0]:
+                try:
+                    data = os.read(fd, 1024)
+                except OSError as e:
+                    if e.errno != errno.EIO:
+                        raise
+                    del readable[fd]
+                    continue
+                if not data:
+                    #if there is no data but we selected, assume end of stream
+                    del readable[fd]
+                    continue
+                if fd == sources[0]:
+                    aout.append(data)
+                    if live_output:
+                        sys.stdout.buffer.write(data)
+                        sys.stdout.buffer.flush()
+                else:
+                    aerr.append(data)
+                    if live_output:
+                        sys.stdout.buffer.write(data)
+                        sys.stderr.buffer.flush()
+                readable[fd].flush()
+    for fd in sources:
+        os.close(fd)
+    exitcode = p.returncode
+    out = b"".join(aout)
+    err = b"".join(aerr)
+    if verbose:
         print("stdout: {}".format(out))
         print("stderr: {}".format(err))
-    if verbose:
         print("exitcode: {}".format(exitcode))
         print("")
     if allow_errors is False and exitcode != 0:
         if not verbose:
-            print("cmd: {}".format(acmd))
+            print("cmd: {}".format(cmd))
             print("stdout: {}".format(out))
             print("stderr: {}".format(err))
             print("exitcode: {}".format(exitcode))
             print("")
         raise
     sys.stdout.flush()
-    return exitcode, out, err
+    sys.stderr.flush()
+    return exitcode, make_str(out), make_str(err)
 
 
 def helper__deepcopy(data):
