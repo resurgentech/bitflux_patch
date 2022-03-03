@@ -19,7 +19,7 @@ def dnf_get_srpm(kernel_version, distro, allow_errors=False, verbose=True, build
     We will make a list of "ElRepo Distributions, and then use the LT version only for them.
     Download kernel rpm which gives us naming convention for downloading srpm
     """
-#    elrepolist = ["centos8"]
+
     if distro in elrepolist:
         return dnf_get_elrepo_kernel_srpm(kernel_version, allow_errors, verbose, builddir)
     else:
@@ -184,7 +184,7 @@ def generate_srpm_config_local(bitflux_version, pkg_release, patchfile_path, rpm
                 run_cmd(cmd, allow_errors=allow_errors, verbose=verbose)
 
 
-def get_package_dnf(args, configs):
+def get_package_dnf(args):
     # Update and upgrade apt repos to latest
     dnf_update_upgrade(allow_errors=True, live_output=False)
     print("rpm repos updated and upgraded")
@@ -198,7 +198,7 @@ def get_package_dnf(args, configs):
     return srpm_filename
 
 
-def rpm_style_build(args, configs):
+def rpm_style_build(args):
     # Update and upgrade apt repos to latest
     dnf_update_upgrade(allow_errors=True, live_output=False)
     print("rpm repos updated and upgraded")
@@ -251,7 +251,8 @@ def rpm_style_build(args, configs):
     # Do build
     if args.nobuild:
         return
-    os.system("rpmbuild --define \"_topdir {}\" -ba {}".format(rpm_topdir, specfile))
+    cmd = "rpmbuild --define \"_topdir {}\" -ba {}".format(rpm_topdir, specfile)
+    run_system(cmd)
 
     # Copy outputs and patches
     run_cmd("rm -rf ./output;", allow_errors=True)

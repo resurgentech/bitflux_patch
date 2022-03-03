@@ -7,8 +7,43 @@ import sys
 import glob
 import shutil
 import json
+import yaml
 import urllib.request
 from time import sleep
+
+
+def run_system(cmd, workingdir=None, allow_errors=False, verbose=False):
+    """
+    Like run_cmd only runs os.system which takes over the execution
+    """
+    if workingdir is not None:
+        acmd = "cd {}; {}".format(workingdir, cmd)
+    else:
+        acmd = cmd
+    # Not sure how else to get exit code with os.system() call
+    acmd += "{}; echo \"$?\" > os_system.exitcode".format(acmd)
+    if verbose:
+        print("cmd: {}".format(acmd))
+    # Actually run the command
+    os.system(acmd)
+    # Lets get the exitcode from the disk
+    if workingdir is not None:
+        exitcode_path = os.path.join(workingdir, 'os_system.exitcode')
+    else:
+        exitcode_path = 'os_system.exitcode'
+    with open(exitcode_path, 'r') as file:
+        exitcode = int(file.read())
+    if verbose:
+        print("exitcode: {}".format(exitcode))
+        print("")
+    if allow_errors is False and exitcode != 0:
+        if not verbose:
+            print("cmd: {}".format(acmd))
+            print("exitcode: {}".format(exitcode))
+            print("")
+        raise
+    sys.stdout.flush()
+    return exitcode
 
 
 def run_cmd(cmd, workingdir=None, allow_errors=False, verbose=False, live_output=False):
@@ -28,6 +63,8 @@ def run_cmd(cmd, workingdir=None, allow_errors=False, verbose=False, live_output
         acmd = "cd {}; {}".format(workingdir, cmd)
     else:
         acmd = cmd
+    if verbose:
+        print("cmd: {}".format(acmd))
     with subprocess.Popen(acmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1, universal_newlines=True) as p:
         for line in p.stdout:
             if live_output:
@@ -42,8 +79,6 @@ def run_cmd(cmd, workingdir=None, allow_errors=False, verbose=False, live_output
     exitcode = p.returncode
     out = "".join(aout)
     err = "".join(aerr)
-    if verbose:
-        print("cmd: {}".format(acmd))
     if verbose and not live_output:
         print("stdout: {}".format(out))
         print("stderr: {}".format(err))
@@ -128,4 +163,10 @@ def copy_outputs(src, outputdir='./output', verbose=True):
 def read_json_file(filename):
     with open(filename, "r") as file:
         contents = json.load(file)
+    return contents
+
+
+def read_yaml_file(filename):
+    with open(filename) as file:
+        contents = yaml.load(file, Loader=yaml.FullLoader)
     return contents

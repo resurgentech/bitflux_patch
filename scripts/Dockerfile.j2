@@ -1,4 +1,4 @@
-FROM resurgentech/kernel_build-centos8:latest
+FROM {{docker_image}}
 
 COPY . /bitflux
 RUN mkdir -p /bitflux/build

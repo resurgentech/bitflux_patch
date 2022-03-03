@@ -8,18 +8,15 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--distro', help='Linux distro', type=str)
-    default_configfile = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'configs.json')
-    parser.add_argument('--config', help='Path to config file for defaults and such', default=default_configfile, type=str)
+    parser.add_argument('--image_searchfactors', help='For .deb, find the kernel package', default='["^linux-image-unsigned-", "generic$"]', type=str)
+    parser.add_argument('--build_style', help='which package style [rpm, deb]', default='deb', type=str)
 
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
 
-    configs = read_json_file(args.config)
-
-    build_style = configs['distros'][args.distro]['build_style']
-    if build_style == 'deb':
-        image_name = get_package_deb(args, configs)
-    elif build_style == 'rpm':
-        image_name = get_package_dnf(args, configs)
+    if args.build_style == 'deb':
+        image_name = get_package_deb(args)
+    elif args.build_style == 'rpm':
+        image_name = get_package_dnf(args)
     print()
     print()
     print("package={}".format(image_name))

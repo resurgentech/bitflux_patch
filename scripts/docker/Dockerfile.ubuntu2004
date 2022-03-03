@@ -1,5 +1,0 @@
-FROM resurgentech/kernel_build-ubuntu2004:latest
-
-COPY . /bitflux
-RUN mkdir -p /bitflux/build
-WORKDIR /bitflux

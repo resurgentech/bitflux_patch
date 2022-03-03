@@ -181,17 +181,20 @@ def build_debs(src_dir, allow_errors=False, verbose=False, live_output=True):
 
     :param path: path with kernel sources to build
     """
-    run_cmd("LANG=C fakeroot debian/rules clean", workingdir=src_dir, allow_errors=allow_errors, verbose=verbose)
+    run_cmd("LANG=C fakeroot debian/rules clean", workingdir=src_dir, allow_errors=allow_errors, verbose=verbose, live_output=live_output)
     print("--debian clean--")
     sys.stdout.flush()
     sleep(3)
-    run_cmd("LANG=C fakeroot debian/rules debian/control", workingdir=src_dir, allow_errors=allow_errors, verbose=verbose)
+    run_cmd("LANG=C fakeroot debian/rules debian/control", workingdir=src_dir, allow_errors=allow_errors, verbose=verbose, live_output=live_output)
     print("--debian contrl--")
     sys.stdout.flush()
     sleep(3)
     #run_cmd("LANG=C fakeroot debian/rules binary", workingdir=src_dir, allow_errors=allow_errors, verbose=verbose, live_output=live_output)
-    # Not sure why but this works
-    os.system("cd {}; LANG=C fakeroot debian/rules binary skipabi=true skipmodule=true skipretpoline=true skipdbg=true disable_d_i=true".format(src_dir))
+    # Build system hates not having a tty or something, run_cmd() fails
+    cmd = "LANG=C fakeroot debian/rules binary"
+    cmd += " skipabi=true skipmodule=true skipretpoline=true"
+    cmd += " skipdbg=true disable_d_i=true"
+    run_system(cmd, workingdir=src_dir, allow_errors=allow_errors, verbose=verbose)
 
 
 def filter_pkg_for_meta_pkg(pkg_filters, filename):
@@ -235,9 +238,8 @@ def build_meta_pkg(ver_ref_pkg, pkg_filters, metapkg_template, allow_errors=Fals
 
 
 # Find package without building
-def get_package_deb(args, configs):
-    config = configs['distros'][args.distro]
-    image_searchfactors = config['image_searchfactors']
+def get_package_deb(args):
+    image_searchfactors = json.loads(args.image_searchfactors)
 
     # Update and upgrade apt repos to latest
     apt_update_upgrade(allow_errors=True, live_output=False)
@@ -252,13 +254,13 @@ def get_package_deb(args, configs):
     return image_name
 
 
-def debian_style_build(args, configs):
-
-    config = configs['distros'][args.distro]
-    image_searchfactors = config['image_searchfactors']
-    ver_ref_pkg = config['ver_ref_pkg']
-    pkg_filters = config['pkg_filters']
-    metapkg_template = config['metapkg_template']
+def debian_style_build(args):
+    image_searchfactors = json.loads(args.image_searchfactors)
+    ver_ref_pkg = args.ver_ref_pkg
+    pkg_filters = json.loads(args.pkg_filters)
+    metapkg_template = args.metapkg_template
+    print("pkg_filters={}".format(pkg_filters))
+    print("image_searchfactors={}".format(image_searchfactors))
 
     # Update and upgrade apt repos to latest
     apt_update_upgrade(allow_errors=True, live_output=False)

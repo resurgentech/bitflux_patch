@@ -2,6 +2,7 @@
 # Copyright (c) Resurgent Technologies 2021
 import os
 import sys
+import yaml
 # adding scripts to add kernel_package_builder
 scriptspath = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'scripts'))
 sys.path.append(scriptspath)
@@ -9,10 +10,10 @@ from kernel_package_builder.common import *
 import jinja2
 
 
-def create_vagrant_tools_file(config, machine_template, machine_name):
+def create_vagrant_tools_file(config, vagrant_box, machine_name):
     with open(config['vagrant_template']) as f:
         template = jinja2.Template(f.read())
-        templateoutput = template.render(machine_template=machine_template, machine_name=machine_name)
+        templateoutput = template.render(vagrant_box=vagrant_box, machine_name=machine_name)
     with open(config['vagrant_definition'], 'w') as f:
         f.write(templateoutput)
 
@@ -116,11 +117,9 @@ def run_tests(configs, args, loops):
 
 if __name__ == '__main__':
     import argparse
-    basedir = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)),".."))
+    basedir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
     parser = argparse.ArgumentParser()
-    default_configfile = os.path.join(basedir, "tests", "configs.json")
-    parser.add_argument('--config', help='Path to config file for defaults and such', default=default_configfile, type=str)
-    parser.add_argument('--machine_template', help='vagrant_tools template to use', type=str)
+    parser.add_argument('--vagrant_box', help='vagrant box for vagrant_tools to use', type=str)
     parser.add_argument('--machine_name', help='name for vagrant_tools to give new vm', type=str)
     parser.add_argument('--key', help='Repo keys', type=str)
     parser.add_argument('--yumrepo', help='Yum repo url', type=str)
@@ -137,18 +136,39 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    if args.machine_template is None or args.machine_name is None:
-        print("need machine_template, machine_name, release")
+    if args.vagrant_box is None or args.machine_name is None:
+        print("need vagrant_box, machine_name")
         parser.print_help()
         sys.exit(1)
 
-    configs = read_json_file(args.config)
-    configs['vagrant_dir'] = os.path.join(basedir, "scripts", "vagrant")
-    configs['ansible_dir'] = os.path.join(basedir, "scripts", "ansible")
+    # default and configs
+    configs = {
+        "vagrant_template": "vagrant/machines.yaml.j2",
+        "vagrant_definition": "vagrant/machines.yaml",
+        "vagrant_dir": "vagrant",
+        "ansible_dir": "ansible",
+        "installer_config": {
+            "installer_url": "https://mirror.bitflux.ai/repository/downloads/tools/installbitflux.run",
+            "installer_filename": "installbitflux.run"
+        },
+        "installer_options": {
+            "license": "",
+            "deviceid": "",
+            "overrides": {
+                "bitflux_key_url": "https://mirror.bitflux.ai/repository/keys/keys/bitflux_pub.key",
+                "yum_repo_baseurl": "https://mirror.bitflux.ai/repository/yum/rocky/$releasever/$basearch",
+                "apt_repo_url": "https://mirror.bitflux.ai/repository/ubuntu"
+            }
+        }
+    }
+    configs['vagrant_dir'] = os.path.join(basedir, configs['vagrant_dir'])
+    configs['ansible_dir'] = os.path.join(basedir, configs['ansible_dir'])
+    configs['vagrant_template'] = os.path.join(basedir, configs['vagrant_template'])
+    configs['vagrant_definition'] = os.path.join(basedir, configs['vagrant_definition'])
     print(configs)
 
     # Make machines.yaml file for vagrant_tools
-    create_vagrant_tools_file(configs, args.machine_template, args.machine_name)
+    create_vagrant_tools_file(configs, args.vagrant_box, args.machine_name)
 
     # create and start vm
     vagrant_tools(configs, args, "vm_create.sh")
