@@ -22,10 +22,6 @@ class KernelBuilder:
         lverbose = verbose if verbose is not None else self.config['verbose']
         return run_cmd(cmd, verbose=lverbose, live_output=live_output)
 
-    def run_system(self, cmd, allow_errors=False, verbose=None):
-        lverbose = verbose if verbose is not None else self.config['verbose']
-        return run_system(cmd, verbose=lverbose, allow_errors=allow_errors)
-
     def build(self):
         self.build_docker_image()
         self.build_kernel_package()
@@ -66,9 +62,7 @@ class KernelBuilder:
         cmd += " python3 {}".format(script)
         for k,v in self.config['settings'].items():
             cmd += " --{} {}".format(k,v)
-        # So the build for debian at least hates not having a tty or something,
-        # This workaround is what we have.
-        self.run_system(cmd)
+        self.run_cmd(cmd)
 
     def build_kernel_package(self):
         print("==============================================================================")

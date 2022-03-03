@@ -7,9 +7,21 @@ import sys
 import glob
 import shutil
 import json
-import yaml
+import pty
+import select
+import errno
 import urllib.request
 from time import sleep
+
+
+def make_str(data):
+    if isinstance(data, str):
+        output = data
+    elif isinstance(data, bytes):
+        output = data.decode('utf-8')
+    else:
+        output = str(data)
+    return output
 
 
 def run_system(cmd, workingdir=None, allow_errors=False, verbose=False):
@@ -46,7 +58,7 @@ def run_system(cmd, workingdir=None, allow_errors=False, verbose=False):
     return exitcode
 
 
-def run_cmd(cmd, workingdir=None, allow_errors=False, verbose=False, live_output=False):
+def run_cmd(cmd, shell=True, workingdir=None, allow_errors=False, verbose=False, live_output=False):
     """
     run a command in the shell
 
@@ -60,41 +72,65 @@ def run_cmd(cmd, workingdir=None, allow_errors=False, verbose=False, live_output
     aout = []
     aerr = []
     if workingdir is not None:
-        acmd = "cd {}; {}".format(workingdir, cmd)
-    else:
-        acmd = cmd
+        cmd = "cd {}; {}".format(workingdir, cmd)
+        shell = True
+    sources, replicas = zip(pty.openpty(), pty.openpty())
     if verbose:
-        print("cmd: {}".format(acmd))
-    with subprocess.Popen(acmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1, universal_newlines=True) as p:
-        for line in p.stdout:
-            if live_output:
-                print(line, end='')
-                sys.stdout.flush()
-            aout.append(line)
-        for line in p.stderr:
-            if live_output:
-                print(line, end='')
-                sys.stdout.flush()
-            aerr.append(line)
+        print("cmd: {}".format(cmd))
+    if not shell and isinstance(cmd, str):
+        cmd = cmd.split()
+    with subprocess.Popen(cmd, shell=shell, stdin=replicas[0], stdout=replicas[0], stderr=replicas[1]) as p:
+        for fd in replicas:
+            os.close(fd)
+            readable = {
+                sources[0]: sys.stdout.buffer,
+                sources[1]: sys.stderr.buffer,
+            }
+        while readable:
+            for fd in select.select(readable, [], [])[0]:
+                try:
+                    data = os.read(fd, 1024)
+                except OSError as e:
+                    if e.errno != errno.EIO:
+                        raise
+                    del readable[fd]
+                    continue
+                if not data:
+                    #if there is no data but we selected, assume end of stream
+                    del readable[fd]
+                    continue
+                if fd == sources[0]:
+                    aout.append(data)
+                    if live_output:
+                        sys.stdout.buffer.write(data)
+                        sys.stdout.buffer.flush()
+                else:
+                    aerr.append(data)
+                    if live_output:
+                        sys.stdout.buffer.write(data)
+                        sys.stderr.buffer.flush()
+                readable[fd].flush()
+    for fd in sources:
+        os.close(fd)
     exitcode = p.returncode
-    out = "".join(aout)
-    err = "".join(aerr)
-    if verbose and not live_output:
+    out = b"".join(aout)
+    err = b"".join(aerr)
+    if verbose:
         print("stdout: {}".format(out))
         print("stderr: {}".format(err))
-    if verbose:
         print("exitcode: {}".format(exitcode))
         print("")
     if allow_errors is False and exitcode != 0:
         if not verbose:
-            print("cmd: {}".format(acmd))
+            print("cmd: {}".format(cmd))
             print("stdout: {}".format(out))
             print("stderr: {}".format(err))
             print("exitcode: {}".format(exitcode))
             print("")
         raise
     sys.stdout.flush()
-    return exitcode, out, err
+    sys.stderr.flush()
+    return exitcode, make_str(out), make_str(err)
 
 
 def helper__deepcopy(data):
@@ -163,10 +199,4 @@ def copy_outputs(src, outputdir='./output', verbose=True):
 def read_json_file(filename):
     with open(filename, "r") as file:
         contents = json.load(file)
-    return contents
-
-
-def read_yaml_file(filename):
-    with open(filename) as file:
-        contents = yaml.load(file, Loader=yaml.FullLoader)
     return contents

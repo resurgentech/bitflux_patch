@@ -194,7 +194,7 @@ def build_debs(src_dir, allow_errors=False, verbose=False, live_output=True):
     cmd = "LANG=C fakeroot debian/rules binary"
     cmd += " skipabi=true skipmodule=true skipretpoline=true"
     cmd += " skipdbg=true disable_d_i=true"
-    run_system(cmd, workingdir=src_dir, allow_errors=allow_errors, verbose=verbose)
+    run_cmd(cmd, workingdir=src_dir, allow_errors=allow_errors, verbose=verbose, live_output=live_output)
 
 
 def filter_pkg_for_meta_pkg(pkg_filters, filename):
@@ -259,12 +259,12 @@ def debian_style_build(args):
     ver_ref_pkg = args.ver_ref_pkg
     pkg_filters = json.loads(args.pkg_filters)
     metapkg_template = args.metapkg_template
-    print("pkg_filters={}".format(pkg_filters))
-    print("image_searchfactors={}".format(image_searchfactors))
+    print("BUILDING DEBIAN STYLE PACKAGE")
 
     # Update and upgrade apt repos to latest
-    apt_update_upgrade(allow_errors=True, live_output=False)
-    print("apt repos updated and upgraded")
+    print("update and upgrade apt repos...")
+    apt_update_upgrade(allow_errors=True)
+    print("DONE - apt repos updated and upgraded")
     sys.stdout.flush()
     sleep(3)
 
@@ -274,7 +274,7 @@ def debian_style_build(args):
     sleep(2)
 
     # Return the newest latest linux kernel image package name
-    image_name = apt_get_linux_image_name(image_searchfactors, verbose=False)
+    image_name = apt_get_linux_image_name(image_searchfactors, verbose=args.verbose)
     print("Found image name:           {}".format(image_name))
     sys.stdout.flush()
 
@@ -286,7 +286,7 @@ def debian_style_build(args):
         raise
 
     # Download source code and return where the kernel source code is located
-    src_dir = apt_get_source(image_name, verbose=True)
+    src_dir = apt_get_source(image_name, verbose=args.verbose)
     print("Found kernel src directory: {}".format(src_dir))
     sys.stdout.flush()
 
@@ -295,27 +295,27 @@ def debian_style_build(args):
     sys.stdout.flush()
 
     # Do patching steps
-    init_commit = patch_in(args.distro, patches_dir, src_dir, verbose=True, clean_patch=True)
+    init_commit = patch_in(args.distro, patches_dir, src_dir, verbose=args.verbose, clean_patch=True)
 
     deb_set_flavour('swaphints', debian_dir, verbose=True)
     commit_and_create_patch('flavour', src_dir, verbose=True)
 
     if init_commit is not None:
         filepath = os.path.join(patches_dir, "complete.patch")
-        commit_and_create_patch(filepath, src_dir, commit_hash=init_commit, verbose=True)
+        commit_and_create_patch(filepath, src_dir, commit_hash=init_commit, verbose=args.verbose)
     print("Patching Complete")
     sys.stdout.flush()
     sleep(3)
 
-    deb_hack_changelog(bitflux_version, src_dir, buildnum=args.buildnumber, verbose=True, clean_patch=True)
+    deb_hack_changelog(bitflux_version, src_dir, buildnum=args.buildnumber, verbose=args.verbose, clean_patch=True)
 
     # Build deb packages
     if args.nobuild:
         return
-    build_debs(src_dir)
+    build_debs(src_dir, verbose=args.verbose)
     build_meta_pkg(ver_ref_pkg, pkg_filters, metapkg_template)
 
     # Copy outputs
-    run_cmd("rm -rf ./output;", allow_errors=True)
-    copy_outputs("./build/*.deb")
-    copy_outputs("{}/*.new".format(patches_dir), outputdir='./output/patches/')
+    run_cmd("rm -rf ./output;", allow_errors=True, verbose=args.verbose)
+    copy_outputs("./build/*.deb", verbose=args.verbose)
+    copy_outputs("{}/*.new".format(patches_dir), outputdir='./output/patches/', verbose=args.verbose)

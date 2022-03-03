@@ -186,12 +186,12 @@ def generate_srpm_config_local(bitflux_version, pkg_release, patchfile_path, rpm
 
 def get_package_dnf(args):
     # Update and upgrade apt repos to latest
-    dnf_update_upgrade(allow_errors=True, live_output=False)
+    dnf_update_upgrade(allow_errors=True, live_output=True)
     print("rpm repos updated and upgraded")
     sys.stdout.flush()
     sleep(2)
 
-    srpm_filename = dnf_get_srpm(None, args.distro, allow_errors=False, verbose=False)
+    srpm_filename = dnf_get_srpm(None, args.distro, allow_errors=False, verbose=args.verbose)
     print("Found srpm name:            {}".format(srpm_filename))
     sys.stdout.flush()
     sleep(2)
@@ -200,8 +200,9 @@ def get_package_dnf(args):
 
 def rpm_style_build(args):
     # Update and upgrade apt repos to latest
-    dnf_update_upgrade(allow_errors=True, live_output=False)
-    print("rpm repos updated and upgraded")
+    print("update and upgrade rpm repos...")
+    dnf_update_upgrade(allow_errors=True, live_output=True, verbose=args.verbose)
+    print("DONE - rpm repos updated and upgraded")
     sys.stdout.flush()
     sleep(2)
 
@@ -215,36 +216,36 @@ def rpm_style_build(args):
     sys.stdout.flush()
     sleep(2)
 
-    srpm_filename = dnf_get_srpm(args.kernel_version, args.distro, allow_errors=False, verbose=False)
+    srpm_filename = dnf_get_srpm(args.kernel_version, args.distro, allow_errors=False, verbose=args.verbose)
     print("Found srpm name:            {}".format(srpm_filename))
     sys.stdout.flush()
     sleep(2)
 
-    patches_dir = select_patches_dir(srpm_filename, verbose=True)
+    patches_dir = select_patches_dir(srpm_filename, verbose=args.verbose)
     print("Found patches directory:    {}".format(patches_dir))
     sys.stdout.flush()
     if patches_dir is None:
         raise
     sleep(2)
 
-    rpm_topdir = rpm_upack_srpm(srpm_filename, allow_errors=False, verbose=False)
+    rpm_topdir = rpm_upack_srpm(srpm_filename, allow_errors=False, verbose=args.verbose)
 
-    tarball = dnf_get_kernel_tarball(srpm_filename, rpm_topdir, allow_errors=False, verbose=False)
+    tarball = dnf_get_kernel_tarball(srpm_filename, rpm_topdir, allow_errors=False, verbose=args.verbose)
 
     print(tarball)
-    patchfile_path = make_unified_patch(args.distro, patches_dir, tarball, allow_errors=False, verbose=False)
+    patchfile_path = make_unified_patch(args.distro, patches_dir, tarball, allow_errors=False, verbose=args.verbose)
     print("Created patch file:         {}".format(patchfile_path))
     sys.stdout.flush()
     sleep(2)
 
     if args.distro in elrepolist:
-        specfile = dnf_hack_elrepo_specfile(bitflux_version, pkg_release, patchfile_path, rpm_topdir, allow_errors=False, verbose=False)
+        specfile = dnf_hack_elrepo_specfile(bitflux_version, pkg_release, patchfile_path, rpm_topdir, allow_errors=False, verbose=args.verbose)
     else:
-        specfile = dnf_hack_srpm_specfile(bitflux_version, pkg_release, patchfile_path, rpm_topdir, allow_errors=False, verbose=False)
+        specfile = dnf_hack_srpm_specfile(bitflux_version, pkg_release, patchfile_path, rpm_topdir, allow_errors=False, verbose=args.verbose)
     print("Modified RPM SPEC file:     {}".format(specfile))
 
     #config-local provides an override location for the spec file to apply config changes. ours just guarantees page_idle and soft_dirty
-    generate_srpm_config_local(bitflux_version, pkg_release, patchfile_path, rpm_topdir, allow_errors=False, verbose=False)
+    generate_srpm_config_local(bitflux_version, pkg_release, patchfile_path, rpm_topdir, allow_errors=False, verbose=args.verbose)
 
     sys.stdout.flush()
     sleep(2)
@@ -252,9 +253,9 @@ def rpm_style_build(args):
     if args.nobuild:
         return
     cmd = "rpmbuild --define \"_topdir {}\" -ba {}".format(rpm_topdir, specfile)
-    run_system(cmd)
+    run_cmd(cmd, verbose=args.verbose, live_output=True)
 
     # Copy outputs and patches
-    run_cmd("rm -rf ./output;", allow_errors=True)
-    copy_outputs("{}/RPMS/x86_64/*.rpm".format(rpm_topdir))
-    copy_outputs("{}/*.new".format(patches_dir), outputdir='./output/patches/')
+    run_cmd("rm -rf ./output;", allow_errors=True, verbose=args.verbose)
+    copy_outputs("{}/RPMS/x86_64/*.rpm".format(rpm_topdir), verbose=args.verbose)
+    copy_outputs("{}/*.new".format(patches_dir), outputdir='./output/patches/', verbose=args.verbose)
