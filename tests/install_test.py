@@ -205,8 +205,14 @@ if __name__ == '__main__':
         installer_options['overrides']['apt_repo_url'] = args.pkgrepo
         installer_options['overrides']['yum_repo_baseurl'] = args.pkgrepo
 
-    # Runs script with ansible to install bitflux to 
-    ansible_bitflux_install(configs, "install_bitflux.yml", args, installer_config, installer_options)
+    if args.tarballcollector is not None:
+        # Runs script with ansible to install bitflux collector with a tarball
+        installer_config['tarball'] = args.tarballcollector
+        run_cmd("mc cp {} latest.tar.gz".format(args.tarballcollector))
+        ansible_bitflux_install(configs, "install_tarballbitflux.yml", args, installer_config, installer_options)
+    else:
+        # Runs script with ansible to install bitflux collector
+        ansible_bitflux_install(configs, "install_bitflux.yml", args, installer_config, installer_options)
 
     if args.manual_modprobe:
         do_ansible_adhoc(configs, args, "sudo modprobe swaphints")

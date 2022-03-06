@@ -1,0 +1,27 @@
+
+---
+- name: role to install tarball bitflux collector
+  hosts: all
+  tasks:
+  - name: Push to remote bitflux collector
+    copy:
+      src: ../../latest.tar.gz
+      dest: /tmp/latest.tar.gz
+  - name: Untar kernel
+    shell: mkdir /tmp/latest; cd /tmp/latest/; tar xvf /tmp/latest.tar.gz
+    args:
+      warn: false
+  - name: Install bitflux collector
+    shell: cd /tmp/latest/; apt install $(ls *.deb | sed 's/^/.\//')
+  - name: Reboot the server
+    shell: "reboot"
+    async: 1
+    poll: 0
+  - name: Wait for the reboot and reconnect
+    wait_for:
+      port: 22
+      host: '{{ (ansible_ssh_host|default(ansible_host))|default(inventory_hostname) }}'
+      search_regex: OpenSSH
+      delay: 10
+      timeout: 60
+    connection: local
