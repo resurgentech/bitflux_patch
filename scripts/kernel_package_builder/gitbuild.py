@@ -32,18 +32,18 @@ def test_git_build(args):
     kernel_version, src_dir = git_checkout_kernel(build_dir, kernel_version, args.giturl, args.gitmirrorpath)
 
     # Match up the patch directory
-    patches_dir = select_patches_dir(kernel_version, verbose=True)
+    patches_dir = select_patches_dir(kernel_version, verbose=args.verbose)
     print("Found patches directory:    {}".format(patches_dir))
     sys.stdout.flush()
     if patches_dir is None:
         raise
 
     # Go ahead and do patching of kernel sources
-    init_commit = patch_in(args.distro, patches_dir, src_dir, verbose=True, clean_patch=True)
+    init_commit = patch_in(args.distro, patches_dir, src_dir, verbose=args.verbose, clean_patch=True)
 
     if init_commit is not None:
         filepath = os.path.join(patches_dir, "complete.patch")
-        commit_and_create_patch(kernel_version, src_dir, commit_hash=init_commit, verbose=True)
+        commit_and_create_patch(kernel_version, src_dir, commit_hash=init_commit, verbose=args.verbose)
     print("Patching Complete")
     sys.stdout.flush()
     sleep(3)
@@ -54,15 +54,15 @@ def test_git_build(args):
         return
 
     # We're going to build ubuntu debs
-    run_cmd("cp /boot/config-$(uname -r) .config", workingdir=src_dir, allow_errors=False, verbose=True)
-    run_cmd("make olddefconfig", workingdir=src_dir, allow_errors=False, verbose=True)
-    run_cmd("./scripts/config --disable SYSTEM_TRUSTED_KEYS", workingdir=src_dir, allow_errors=False, verbose=True)
-    run_cmd("./scripts/config --disable SYSTEM_REVOCATION_KEYS", workingdir=src_dir, allow_errors=False, verbose=True)
-    run_cmd("make olddefconfig", workingdir=src_dir, allow_errors=False, verbose=True)
-    exitcode, _, _ = run_cmd("make -j $(nproc) deb-pkg LOCALVERSION=-custom", workingdir=src_dir, allow_errors=True, live_output=True, verbose=True)
+    run_cmd("cp /boot/config-$(uname -r) .config", workingdir=src_dir, allow_errors=False, verbose=args.verbose)
+    run_cmd("make olddefconfig", workingdir=src_dir, allow_errors=False, verbose=args.verbose)
+    run_cmd("./scripts/config --disable SYSTEM_TRUSTED_KEYS", workingdir=src_dir, allow_errors=False, verbose=args.verbose)
+    run_cmd("./scripts/config --disable SYSTEM_REVOCATION_KEYS", workingdir=src_dir, allow_errors=False, verbose=args.verbose)
+    run_cmd("make olddefconfig", workingdir=src_dir, allow_errors=False, verbose=args.verbose)
+    exitcode, _, _ = run_cmd("make -j $(nproc) deb-pkg LOCALVERSION=-custom", workingdir=src_dir, allow_errors=True, live_output=True, verbose=args.verbose)
     if exitcode != 0:
         # If make dies run it single threaded to make debug easier
-        run_cmd("make", workingdir=src_dir, allow_errors=True, verbose=True, live_output=True)
+        run_cmd("make", workingdir=src_dir, allow_errors=True, verbose=args.verbose, live_output=True)
 
     # Copy outputs
     run_cmd("rm -rf ./output;", allow_errors=True)

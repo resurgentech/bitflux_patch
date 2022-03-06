@@ -58,6 +58,11 @@ class KernelBuilder:
         cmd += " --privileged"
         cmd += " --name {}".format(self.config['container_name'])
         cmd += " --volume /boot:/boot"
+        # Add mirrors directory if you can
+        if os.path.exists('/opt/mirrors'):
+            cmd += " --volume /opt/mirrors:/opt/mirrors"
+        elif self.config['settings']['build_type'] == 'git':
+            print('!!!!Building in git mode without a mirror will take a while!!!!')
         cmd += " {}".format(self.config['image_name'])
         cmd += " python3 {}".format(script)
         for k,v in self.config['settings'].items():
