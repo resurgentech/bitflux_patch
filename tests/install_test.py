@@ -169,6 +169,12 @@ if __name__ == '__main__':
     # Make machines.yaml file for vagrant_tools
     create_vagrant_tools_file(configs, args.vagrant_box, args.machine_name)
 
+    # Clean up any failed tests that conflict
+    # _default is kind of a hack but it works on our machines
+    virsh_domain = "{}_default".format(args.machine_name)
+    run_cmd("sudo virsh destroy --domain {}".format(virsh_domain), allow_errors=True)
+    run_cmd("sudo virsh undefine --domain {} --remove-all-storage".format(virsh_domain), allow_errors=True)
+
     # create and start vm
     vagrant_tools(configs, args, "vm_create.sh")
 
