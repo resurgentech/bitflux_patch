@@ -9,3 +9,10 @@ else
 fi
 
 vagrant_tools -a up -c $VAGRANT_MACHINE_DEF
+
+TARGETIPS=($(cat inventory.yaml | grep ansible_ip | sed 's/\s*ansible_ip\:\s*//'))
+for TARGETIP in ${TARGETIPS[@]}
+do
+  echo $TARGETIP
+  ssh-keygen -f ~/.ssh/known_hosts -R $TARGETIP
+done
