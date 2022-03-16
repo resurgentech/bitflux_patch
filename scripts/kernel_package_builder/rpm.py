@@ -11,7 +11,7 @@ def dnf_update_upgrade(allow_errors=False, verbose=False, live_output=False):
     """
     Update and upgrade rpm repos to latest
     """
-    run_cmd("dnf update -y --enableupdate=elrepo-kernel", allow_errors=allow_errors, verbose=verbose, live_output=live_output)
+    run_cmd("dnf update -y", allow_errors=allow_errors, verbose=verbose, live_output=live_output)
 
 
 def dnf_get_srpm(kernel_version, distro, allow_errors=False, verbose=True, builddir='./build'):
