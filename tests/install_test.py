@@ -155,8 +155,8 @@ if __name__ == '__main__':
             "deviceid": "",
             "overrides": {
                 "bitflux_key_url": "https://mirror.bitflux.ai/repository/keys/keys/bitflux_pub.key",
-                "yum_repo_baseurl": "https://mirror.bitflux.ai/repository/yum/rocky/$releasever/$basearch",
-                "apt_repo_url": "https://mirror.bitflux.ai/repository/ubuntu"
+                "yum_repo_baseurl": "https://mirror.bitflux.ai/repository/yum/release/rocky/$releasever/$basearch",
+                "apt_repo_url": "https://mirror.bitflux.ai/repository/yumRelease"
             }
         }
     }
@@ -201,10 +201,12 @@ if __name__ == '__main__':
         ansible_bitflux_install(configs, "install_tarballkernel.yml", args, installer_config, installer_options)
     elif args.pkgrepokernel is not None:
         # Runs script with ansible to install kernel
+        installer_options['nocollector'] = ''
         installer_options['overrides']['apt_repo_url'] = args.pkgrepokernel
         installer_options['overrides']['yum_repo_baseurl'] = args.pkgrepokernel
         ansible_bitflux_install(configs, "install_bitflux.yml", args, installer_config, installer_options)
         # Set options to install collector in next round
+        del installer_options['nocollector']
         installer_options['nokernel'] = ''
 
     if args.pkgrepo is not None:
