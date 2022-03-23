@@ -12,7 +12,7 @@
     args:
       warn: false
   - name: Install bitflux collector
-    shell: cd /tmp/latest/deb; apt install $(ls *.deb | sed 's/^/.\//')
+    shell: cd /tmp/latest/deb; apt install -y $(ls *.deb | sed 's/^/.\//')
   - name: Reboot the server
     shell: "reboot"
     async: 1
