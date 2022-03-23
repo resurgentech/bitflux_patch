@@ -111,7 +111,7 @@ def check_for_memhog(configs, args):
 
 
 def memhog(configs, args):
-    exitcode, out, err = do_ansible_adhoc(configs, args, "bash -c \"memhog --size 1G --test 6 --waitTime 1&\"")
+    exitcode, out, err = do_ansible_adhoc(configs, args, "nohup memhog --size 1G --test 6 --waitTime 1 &")
     if exitcode != 0:
         print("exitcode: {}".format(exitcode))
         print("stdout: '{}'".format(out))
@@ -161,7 +161,7 @@ def run_tests(configs, args, loops):
     print("++++++++++++++++PASSED COLLECTOR CHECK++++++++++++++++++++++++++++", flush=True)
 
     memhog(configs, args)
-    sleep(300)
+    sleep(30)
 
     if check_for_memhog(configs, args):
         print("----------------FAILED MEMHOG CHECK-----------------------------", flush=True)
