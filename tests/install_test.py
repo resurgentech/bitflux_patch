@@ -44,10 +44,7 @@ def do_ansible(configs, script, args, extravars=None, interpreter=None):
 
 def ansible_memhog_install(configs, args, memhogconfig, script='install_memhog.yml', interpreter='python3'):
     # lets escape this structure for the command line
-    a = {}
-    for k in ['license', 'deviceid']:
-        a[k] = memhogconfig[k]
-    ic = json.dumps(json.dumps(a))
+    ic = json.dumps(json.dumps(memhogconfig))
     return do_ansible(configs, script, args, extravars=ic, interpreter=interpreter)
 
 
@@ -287,7 +284,10 @@ if __name__ == '__main__':
     if args.tarballcollector is not None:
         # Runs script with ansible to install bitflux collector with a tarball
         run_cmd("mc cp {} latest.tar.gz".format(args.tarballcollector))
-        ansible_bitflux_install(configs, "install_tarballbitflux.yml", args, installer_options, installer_options)
+        a = {}
+        for k in ['license', 'deviceid']:
+            a[k] = installer_options[k]
+        ansible_bitflux_install(configs, "install_tarballbitflux.yml", args, a, {})
     else:
         # Runs script with ansible to install bitflux collector
         ansible_bitflux_install(configs, "install_bitflux.yml", args, installer_config, installer_options)
