@@ -111,7 +111,7 @@ def check_for_memhog(configs, args):
 
 
 def memhog(configs, args):
-    exitcode, out, err = do_ansible_adhoc(configs, args, "bash -c \"memhog --size 1G --test 6 --waitTime 1&; ps aux | grep memhog\"")
+    exitcode, out, err = do_ansible_adhoc(configs, args, "bash -c \"memhog --size 1G --test 6 --waitTime 1&\"")
     if exitcode != 0:
         print("exitcode: {}".format(exitcode))
         print("stdout: '{}'".format(out))
