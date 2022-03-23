@@ -35,6 +35,7 @@ def do_ansible(configs, script, args, extravars=None, interpreter=None):
     if extravars is not None:
         cmd += " --extra-vars {}".format(extravars)
     cmd += " {}".format(args.verbosity)
+    print("do_ansible: '{}'".format(cmd))
     run_cmd(cmd, live_output=True)
 
 
@@ -61,6 +62,7 @@ def ansible_bitflux_install(configs, script, args, installer_config, installer_o
 def do_ansible_adhoc(configs, args, adhoc_cmd):
     invfile = os.path.join(configs['vagrant_dir'], "inventory.yaml")
     cmd = "ANSIBLE_HOST_KEY_CHECKING=False ansible all -i {} -m shell -a '{}'".format(invfile, adhoc_cmd)
+    print("do_ansible_adhoc: '{}'".format(cmd))
     return run_cmd(cmd, allow_errors=True)
 
 
