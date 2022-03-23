@@ -38,6 +38,12 @@ def do_ansible(configs, script, args, extravars=None, interpreter=None):
     run_cmd(cmd, live_output=True)
 
 
+def ansible_memhog_install(configs, args, memhogconfig, script='install_memhog.yml', interpreter='python3'):
+    # lets escape this structure for the command line
+    ic = json.dumps(json.dumps(memhogconfig))
+    do_ansible(configs, script, args, extravars=ic, interpreter=interpreter)
+
+
 def ansible_bitflux_install(configs, script, args, installer_config, installer_options, interpreter='python3'):
     # formating parameters for bitflux installer
     options = ""
@@ -66,6 +72,16 @@ def check_for_swaphints(configs, args):
         print("stderr: '{}'".format(err))
         return 1
     if out.find('swaphints') <= 0:
+        print("stdout: '{}'".format(out))
+        print("stderr: '{}'".format(err))
+        return 1
+    return 0
+
+
+def memhog(configs, args):
+    exitcode, out, err = do_ansible_adhoc(configs, args, "memhog --size 1G --test 6 --waitTime 1&")
+    if exitcode != 0:
+        print("exitcode: {}".format(exitcode))
         print("stdout: '{}'".format(out))
         print("stderr: '{}'".format(err))
         return 1
@@ -103,6 +119,10 @@ def run_tests(configs, args, loops):
         print("----------------FAILED SWAPHINTS CHECK-----------------------------")
         return 1
     print("++++++++++++++++PASSED SWAPHINTS CHECK++++++++++++++++++++++++++++")
+
+    if memhog(configs, args):
+        print("----------------FAILED MEMHOG-----------------------------")
+        return 1
 
     # Loop until timing out or we detect swapped pages
     for i in range(loops):
@@ -146,6 +166,10 @@ if __name__ == '__main__':
         "vagrant_definition": "vagrant/machines.yaml",
         "vagrant_dir": "vagrant",
         "ansible_dir": "ansible",
+        "memhog_config": {
+            "memhog_url": "https://mirror.bitflux.ai/repository/downloads/tools/memhog",
+            "memhog_path": "/usr/bin/memhog"
+        },
         "installer_config": {
             "installer_url": "https://mirror.bitflux.ai/repository/downloads/tools/installbitflux.run",
             "installer_filename": "installbitflux.run"
@@ -156,7 +180,7 @@ if __name__ == '__main__':
             "overrides": {
                 "bitflux_key_url": "https://mirror.bitflux.ai/repository/keys/keys/bitflux_pub.key",
                 "yum_repo_baseurl": "https://mirror.bitflux.ai/repository/yum/release/rocky/$releasever/$basearch",
-                "apt_repo_url": "https://mirror.bitflux.ai/repository/yumRelease"
+                "apt_repo_url": "https://mirror.bitflux.ai/repository/focalRelease"
             }
         }
     }
@@ -224,6 +248,8 @@ if __name__ == '__main__':
 
     if args.manual_modprobe:
         do_ansible_adhoc(configs, args, "sudo modprobe swaphints")
+
+    ansible_memhog_install(configs, args, memhogconfig)
 
     # Testing
     retval = run_tests(configs, args, 10)

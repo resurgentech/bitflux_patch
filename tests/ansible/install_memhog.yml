@@ -1,0 +1,9 @@
+---
+- name: role to install memhog
+  hosts: all
+  tasks:
+  - name: Download memhog
+    get_url:
+      url: "{{ memhog_url }}"
+      dest: "{{ memhog_path }}"
+      mode: '0777'
