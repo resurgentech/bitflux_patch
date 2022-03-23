@@ -7,12 +7,12 @@
     copy:
       src: ../../latest.tar.gz
       dest: /tmp/latest.tar.gz
-  - name: Untar kernel
+  - name: Untar bitflux collector
     shell: mkdir /tmp/latest; cd /tmp/latest/; tar xvf /tmp/latest.tar.gz
     args:
       warn: false
   - name: Install bitflux collector
-    shell: cd /tmp/latest/; apt install $(ls *.deb | sed 's/^/.\//')
+    shell: cd /tmp/latest/deb; apt install $(ls *.deb | sed 's/^/.\//')
   - name: Reboot the server
     shell: "reboot"
     async: 1
