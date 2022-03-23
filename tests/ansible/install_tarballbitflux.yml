@@ -13,6 +13,10 @@
       warn: false
   - name: Install bitflux collector
     shell: cd /tmp/latest/deb; apt install -y $(ls *.deb | sed 's/^/.\//')
+  - name: Change license key
+    shell: "sed -i \"s/licensekey.*/licensekey={{ license }}/g\" /opt/bitflux/config/bitflux/bitfluxcollector.conf"
+  - name: Change deviceid
+    shell: "sed -i \"s/deviceid.*/deviceid={{ deviceid }}/g\" /opt/bitflux/config/bitflux/bitfluxcollector.conf"
   - name: Reboot the server
     shell: "reboot"
     async: 1
