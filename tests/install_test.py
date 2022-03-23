@@ -161,7 +161,7 @@ def run_tests(configs, args, loops):
     print("++++++++++++++++PASSED COLLECTOR CHECK++++++++++++++++++++++++++++", flush=True)
 
     memhog(configs, args)
-    sleep(10)
+    sleep(300)
 
     if check_for_memhog(configs, args):
         print("----------------FAILED MEMHOG CHECK-----------------------------", flush=True)
