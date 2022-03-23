@@ -249,7 +249,7 @@ if __name__ == '__main__':
     if args.manual_modprobe:
         do_ansible_adhoc(configs, args, "sudo modprobe swaphints")
 
-    ansible_memhog_install(configs, args, memhogconfig)
+    ansible_memhog_install(configs, args, configs['memhog_config'])
 
     # Testing
     retval = run_tests(configs, args, 10)
