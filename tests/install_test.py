@@ -21,6 +21,7 @@ def create_vagrant_tools_file(config, vagrant_box, machine_name):
 def vagrant_tools(configs, args, script):
     cmd = "cd {}; ./{}".format(configs['vagrant_dir'], script)
     run_cmd(cmd, live_output=True)
+    sys.stdout.flush()
 
 
 def do_ansible(configs, script, args, extravars=None, interpreter=None):
@@ -35,14 +36,16 @@ def do_ansible(configs, script, args, extravars=None, interpreter=None):
     if extravars is not None:
         cmd += " --extra-vars {}".format(extravars)
     cmd += " {}".format(args.verbosity)
-    print("do_ansible: '{}'".format(cmd))
-    run_cmd(cmd, live_output=True)
+    print("do_ansible: '{}'".format(cmd), flush=True)
+    exitcode, out, err = run_cmd(cmd, live_output=True)
+    sys.stdout.flush()
+    return exitcode, out, err
 
 
 def ansible_memhog_install(configs, args, memhogconfig, script='install_memhog.yml', interpreter='python3'):
     # lets escape this structure for the command line
     ic = json.dumps(json.dumps(memhogconfig))
-    do_ansible(configs, script, args, extravars=ic, interpreter=interpreter)
+    return do_ansible(configs, script, args, extravars=ic, interpreter=interpreter)
 
 
 def ansible_bitflux_install(configs, script, args, installer_config, installer_options, interpreter='python3'):
@@ -56,14 +59,16 @@ def ansible_bitflux_install(configs, script, args, installer_config, installer_o
     installer_config['installer_options'] = options
     # lets escape this structure for the command line
     ic = json.dumps(json.dumps(installer_config))
-    do_ansible(configs, script, args, extravars=ic, interpreter=interpreter)
+    return do_ansible(configs, script, args, extravars=ic, interpreter=interpreter)
 
 
 def do_ansible_adhoc(configs, args, adhoc_cmd):
     invfile = os.path.join(configs['vagrant_dir'], "inventory.yaml")
     cmd = "ANSIBLE_HOST_KEY_CHECKING=False ansible all -i {} -m shell -a '{}'".format(invfile, adhoc_cmd)
-    print("do_ansible_adhoc: '{}'".format(cmd))
-    return run_cmd(cmd, allow_errors=True)
+    print("do_ansible_adhoc: '{}'".format(cmd), flush=True)
+    exitcode, out, err = run_cmd(cmd, allow_errors=True)
+    sys.stdout.flush()
+    return exitcode, out, err
 
 
 def check_for_swaphints(configs, args):
@@ -72,10 +77,11 @@ def check_for_swaphints(configs, args):
         print("exitcode: {}".format(exitcode))
         print("stdout: '{}'".format(out))
         print("stderr: '{}'".format(err))
-        return 1
+        sys.stdout.flush()
     if out.find('swaphints') <= 0:
         print("stdout: '{}'".format(out))
         print("stderr: '{}'".format(err))
+        sys.stdout.flush()
         return 1
     return 0
 
@@ -87,6 +93,7 @@ def check_for_collector(configs, args):
         print("exitcode: {}".format(exitcode))
         print("stdout: '{}'".format(out))
         print("stderr: '{}'".format(err))
+        sys.stdout.flush()
         return 1
     return 0
 
@@ -98,6 +105,7 @@ def check_for_memhog(configs, args):
         print("exitcode: {}".format(exitcode))
         print("stdout: '{}'".format(out))
         print("stderr: '{}'".format(err))
+        sys.stdout.flush()
         return 1
     return 0
 
@@ -108,6 +116,7 @@ def memhog(configs, args):
         print("exitcode: {}".format(exitcode))
         print("stdout: '{}'".format(out))
         print("stderr: '{}'".format(err))
+        sys.stdout.flush()
         return 1
     return 0
 
@@ -118,6 +127,7 @@ def swapping(configs, args):
         print("exitcode: {}".format(exitcode))
         print("stdout: '{}'".format(out))
         print("stderr: '{}'".format(err))
+        sys.stdout.flush()
         return 0
     swaptotal = 0
     swapfree = 0
@@ -133,6 +143,7 @@ def swapping(configs, args):
         print("swapped: {} swaptotal: {} swapfree: {}".format(swapped, swaptotal, swapfree))
         print("stdout: '{}'".format(out))
         print("stderr: '{}'".format(err))
+        sys.stdout.flush()
         return 0
     return 1
 
@@ -140,30 +151,30 @@ def swapping(configs, args):
 def run_tests(configs, args, loops):
     # check if kernel module loads
     if check_for_swaphints(configs, args):
-        print("----------------FAILED SWAPHINTS CHECK-----------------------------")
+        print("----------------FAILED SWAPHINTS CHECK-----------------------------", flush=True)
         return 1
-    print("++++++++++++++++PASSED SWAPHINTS CHECK++++++++++++++++++++++++++++")
+    print("++++++++++++++++PASSED SWAPHINTS CHECK++++++++++++++++++++++++++++", flush=True)
 
     if check_for_collector(configs, args):
-        print("----------------FAILED COLLECTOR CHECK-----------------------------")
+        print("----------------FAILED COLLECTOR CHECK-----------------------------", flush=True)
         return 1
-    print("++++++++++++++++PASSED COLLECTOR CHECK++++++++++++++++++++++++++++")
+    print("++++++++++++++++PASSED COLLECTOR CHECK++++++++++++++++++++++++++++", flush=True)
 
     memhog(configs, args)
 
     if check_for_memhog(configs, args):
-        print("----------------FAILED MEMHOG CHECK-----------------------------")
+        print("----------------FAILED MEMHOG CHECK-----------------------------", flush=True)
         return 1
-    print("++++++++++++++++PASSED MEMHOG CHECK++++++++++++++++++++++++++++")
+    print("++++++++++++++++PASSED MEMHOG CHECK++++++++++++++++++++++++++++", flush=True)
 
     # Loop until timing out or we detect swapped pages
     for i in range(loops):
         sleep(60)
         passed = swapping(configs, args)
         if passed:
-            print("++++++++++++++++PASSED SWAPPING CHECK++++++++++++++++++++++++++++")
+            print("++++++++++++++++PASSED SWAPPING CHECK++++++++++++++++++++++++++++", flush=True)
             return 0
-    print("----------------FAILED SWAPPING CHECK-----------------------------")
+    print("----------------FAILED SWAPPING CHECK-----------------------------", flush=True)
     return 1
 
 
