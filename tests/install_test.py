@@ -80,6 +80,28 @@ def check_for_swaphints(configs, args):
     return 0
 
 
+def check_for_collector(configs, args):
+    cmd = "sudo systemctl status bitfluxcollector -n 0"
+    exitcode, out, err = do_ansible_adhoc(configs, args, cmd)
+    if exitcode != 0:
+        print("exitcode: {}".format(exitcode))
+        print("stdout: '{}'".format(out))
+        print("stderr: '{}'".format(err))
+        return 1
+    return 0
+
+
+def check_for_memhog(configs, args):
+    cmd = "ps aux | grep memhog | grep -v grep"
+    exitcode, out, err = do_ansible_adhoc(configs, args, cmd)
+    if exitcode != 0:
+        print("exitcode: {}".format(exitcode))
+        print("stdout: '{}'".format(out))
+        print("stderr: '{}'".format(err))
+        return 1
+    return 0
+
+
 def memhog(configs, args):
     exitcode, out, err = do_ansible_adhoc(configs, args, "memhog --size 1G --test 6 --waitTime 1&")
     if exitcode != 0:
@@ -122,9 +144,17 @@ def run_tests(configs, args, loops):
         return 1
     print("++++++++++++++++PASSED SWAPHINTS CHECK++++++++++++++++++++++++++++")
 
-    if memhog(configs, args):
-        print("----------------FAILED MEMHOG-----------------------------")
+    if check_for_collector(configs, args):
+        print("----------------FAILED COLLECTOR CHECK-----------------------------")
         return 1
+    print("++++++++++++++++PASSED COLLECTOR CHECK++++++++++++++++++++++++++++")
+
+    memhog(configs, args)
+
+    if check_for_memhog(configs, args):
+        print("----------------FAILED MEMHOG CHECK-----------------------------")
+        return 1
+    print("++++++++++++++++PASSED MEMHOG CHECK++++++++++++++++++++++++++++")
 
     # Loop until timing out or we detect swapped pages
     for i in range(loops):
