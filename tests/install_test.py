@@ -149,7 +149,7 @@ def install_collector(args, configs, installer_options, installer_config):
         ansible_bitflux_install(configs, "install_bitflux.yml", args, installer_config, installer_options)
 
 
-def get_collector_packages(config, args):
+def get_collector_packages(configs, args):
     exitcode, out, err = do_ansible_adhoc(configs, args, "cat /etc/redhat-release")
     if exitcode == 0:
         # RedHat style
@@ -173,7 +173,7 @@ def get_collector_packages(config, args):
     return 0
 
 
-def get_kernel_packages(config, args):
+def get_kernel_packages(configs, args):
     exitcode, out, err = do_ansible_adhoc(configs, args, "cat /etc/redhat-release")
     if exitcode == 0:
         # RedHat style
@@ -199,12 +199,12 @@ def get_kernel_packages(config, args):
 
 def check_packages(configs, args):
     if args.collector_revision is not None:
-        if get_collector_packages(config, args):
+        if get_collector_packages(configs, args):
             print("----------------FAILED COLLECTOR PACKAGE VERSION CHECK-----------------------------", flush=True)
             return 1
         print("++++++++++++++++PASSED COLLECTOR PACKAGE VERSION CHECK++++++++++++++++++++++++++++", flush=True)
     if args.kernel_revision is not None:
-        if get_kernel_packages(config, args):
+        if get_kernel_packages(configs, args):
             print("----------------FAILED KERNEL PACKAGE VERSION CHECK-----------------------------", flush=True)
             return 1
         print("++++++++++++++++PASSED KERNEL PACKAGE VERSION CHECK++++++++++++++++++++++++++++", flush=True)
