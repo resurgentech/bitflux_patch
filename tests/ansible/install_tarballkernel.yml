@@ -15,15 +15,5 @@
     shell: cd /tmp/latest/; apt install $(ls *.deb | sed 's/^/.\//')
   - name: Autoload Kernel
     shell: echo \"swaphints\" >> /etc/modules-load.d/swaphints.conf
-  - name: Reboot the server
-    shell: "reboot"
-    async: 1
-    poll: 0
-  - name: Wait for the reboot and reconnect
-    wait_for:
-      port: 22
-      host: '{{ (ansible_ssh_host|default(ansible_host))|default(inventory_hostname) }}'
-      search_regex: OpenSSH
-      delay: 10
-      timeout: 90
-    connection: local
+  - name: reboot
+    reboot:

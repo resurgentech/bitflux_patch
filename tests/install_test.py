@@ -71,6 +71,146 @@ def do_ansible_adhoc(configs, args, adhoc_cmd):
     return exitcode, out, err
 
 
+def setup_config(basedir, args):
+    configs = {
+        "vagrant_template": "vagrant/machines.yaml.j2",
+        "vagrant_definition": "vagrant/machines.yaml",
+        "vagrant_dir": "vagrant",
+        "ansible_dir": "ansible",
+        "memhog_config": {
+            "memhog_url": "https://mirror.bitflux.ai/repository/downloads/tools/memhog",
+            "memhog_path": "/usr/bin/memhog"
+        },
+        "installer_config": {
+            "installer_url": "https://mirror.bitflux.ai/repository/downloads/tools/installbitflux.run",
+            "installer_filename": "installbitflux.run"
+        },
+        "installer_options": {
+            "license": "",
+            "deviceid": "",
+            "overrides": {
+                "bitflux_key_url": "https://mirror.bitflux.ai/repository/keys/keys/bitflux_pub.key",
+                "yum_repo_baseurl": "https://mirror.bitflux.ai/repository/yum/release/rocky/$releasever/$basearch",
+                "apt_repo_url": "https://mirror.bitflux.ai/repository/focalRelease"
+            }
+        }
+    }
+    configs['vagrant_dir'] = os.path.join(basedir, configs['vagrant_dir'])
+    configs['ansible_dir'] = os.path.join(basedir, configs['ansible_dir'])
+    configs['vagrant_template'] = os.path.join(basedir, configs['vagrant_template'])
+    configs['vagrant_definition'] = os.path.join(basedir, configs['vagrant_definition'])
+    # form inputs for ansible installer script
+    installer_config = helper__deepcopy(configs['installer_config'])
+    installer_options = helper__deepcopy(configs['installer_options'])
+    if args.key is not None:
+        installer_options['overrides']['bitflux_key_url'] = args.key
+    if args.license is not None:
+        installer_options['license'] = args.license
+    if args.deviceid is not None:
+        installer_options['deviceid'] = args.deviceid
+    if args.no_grub_update is None:
+        installer_options['grub_update'] = ''
+
+    return configs, installer_config, installer_options
+
+
+def install_kernel(args, configs, installer_options, installer_config):
+    if args.tarballkernel is not None:
+        # Runs script with ansible to install kernel with a tarball
+        installer_options['nokernel'] = ''
+        installer_config['tarball'] = args.tarballkernel
+        run_cmd("mc cp {} latest.tar.gz".format(args.tarballkernel))
+        ansible_bitflux_install(configs, "install_tarballkernel.yml", args, installer_config, installer_options)
+    elif args.pkgrepokernel is not None:
+        # Runs script with ansible to install kernel
+        installer_options['nocollector'] = ''
+        installer_options['overrides']['apt_repo_url'] = args.pkgrepokernel
+        installer_options['overrides']['yum_repo_baseurl'] = args.pkgrepokernel
+        ansible_bitflux_install(configs, "install_bitflux.yml", args, installer_config, installer_options)
+        # Set options to install collector in next round
+        del installer_options['nocollector']
+        installer_options['nokernel'] = ''
+
+
+def install_collector(args, configs, installer_options, installer_config):
+    if args.pkgrepo is not None:
+        installer_options['overrides']['apt_repo_url'] = args.pkgrepo
+        installer_options['overrides']['yum_repo_baseurl'] = args.pkgrepo
+
+    if args.tarballcollector is not None:
+        # Runs script with ansible to install bitflux collector with a tarball
+        run_cmd("mc cp {} latest.tar.gz".format(args.tarballcollector))
+        a = {}
+        for k in ['license', 'deviceid']:
+            a[k] = installer_options[k]
+        ansible_bitflux_install(configs, "install_tarballbitflux.yml", args, a, {})
+    else:
+        # Runs script with ansible to install bitflux collector
+        ansible_bitflux_install(configs, "install_bitflux.yml", args, installer_config, installer_options)
+
+
+def get_collector_packages(config, args):
+    exitcode, out, err = do_ansible_adhoc(configs, args, "cat /etc/redhat-release")
+    if exitcode == 0:
+        # RedHat style
+        re_str = r'\S+\s+([0-9\.\-]+)'
+        cmd = "dnf list installed bitfluxcollector"
+    else:
+        # Debian style
+        re_str = r'\S+\s+([0-9\.\-]+)+\s+\S+\s+\[installed'
+        cmd = "apt list bitfluxcollector -a"
+    exitcode, out, err = do_ansible_adhoc(configs, args, cmd)
+    if exitcode != 0:
+        print("exitcode: {}".format(exitcode))
+        print("stdout: '{}'".format(out))
+        print("stderr: '{}'".format(err))
+        sys.stdout.flush()
+    m = re.findall(re_str, a)
+    rev = m[-1]
+    if args.collector_revision != rev:
+        print("actual: {} expected: {}".format(rev, args.collector_revision))
+        return 1
+    return 0
+
+
+def get_kernel_packages(config, args):
+    exitcode, out, err = do_ansible_adhoc(configs, args, "cat /etc/redhat-release")
+    if exitcode == 0:
+        # RedHat style
+        re_str = r'\S+\s+(\S+)'
+        cmd = "dnf list installed kernel-swaphints"
+    else:
+        # Debian style
+        re_str = r'\S+\s+(\S+)\s+\S+\s+\[installed'
+        cmd = "apt list linux-image-swaphints -a"
+    exitcode, out, err = do_ansible_adhoc(configs, args, cmd)
+    if exitcode != 0:
+        print("exitcode: {}".format(exitcode))
+        print("stdout: '{}'".format(out))
+        print("stderr: '{}'".format(err))
+        sys.stdout.flush()
+    m = re.findall(re_str, a)
+    rev = m[-1]
+    if args.collector_revision != rev:
+        print("actual: {} expected: {}".format(rev, args.collector_revision))
+        return 1
+    return 0
+
+
+def check_packages(configs, args):
+    if args.collector_revision is not None:
+        if get_collector_packages(config, args):
+            print("----------------FAILED COLLECTOR PACKAGE VERSION CHECK-----------------------------", flush=True)
+            return 1
+        print("++++++++++++++++PASSED COLLECTOR PACKAGE VERSION CHECK++++++++++++++++++++++++++++", flush=True)
+    if args.kernel_revision is not None:
+        if get_kernel_packages(config, args):
+            print("----------------FAILED KERNEL PACKAGE VERSION CHECK-----------------------------", flush=True)
+            return 1
+        print("++++++++++++++++PASSED KERNEL PACKAGE VERSION CHECK++++++++++++++++++++++++++++", flush=True)
+    return 0
+
+
 def check_for_swaphints(configs, args):
     exitcode, out, err = do_ansible_adhoc(configs, args, "lsmod")
     if exitcode != 0:
@@ -149,12 +289,19 @@ def swapping(configs, args):
 
 
 def run_tests(configs, args, loops):
+    # check package version
+    if check_packages(configs, args):
+        print("----------------FAILED PACKAGE VERSION CHECK-----------------------------", flush=True)
+        return 1
+    print("++++++++++++++++PASSED PACKAGE VERSION CHECK++++++++++++++++++++++++++++", flush=True)
+
     # check if kernel module loads
     if check_for_swaphints(configs, args):
         print("----------------FAILED SWAPHINTS CHECK-----------------------------", flush=True)
         return 1
     print("++++++++++++++++PASSED SWAPHINTS CHECK++++++++++++++++++++++++++++", flush=True)
 
+    # check if collector is running
     if check_for_collector(configs, args):
         print("----------------FAILED COLLECTOR CHECK-----------------------------", flush=True)
         return 1
@@ -196,6 +343,8 @@ if __name__ == '__main__':
     parser.add_argument('--verbosity', help='verbose mode for ansible ex. -vvv', default='', type=str)
     parser.add_argument('--tarballkernel', help='Install kernel from tarball from minio', type=str)
     parser.add_argument('--tarballcollector', help='Install collector from tarball from minio', type=str)
+    parser.add_argument('--collector_revision', help='Collector revision to confirm install', type=str)
+    parser.add_argument('--kernel_revision', help='kernel revision to confirm install', type=str)
 
     args = parser.parse_args()
 
@@ -205,33 +354,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     # default and configs
-    configs = {
-        "vagrant_template": "vagrant/machines.yaml.j2",
-        "vagrant_definition": "vagrant/machines.yaml",
-        "vagrant_dir": "vagrant",
-        "ansible_dir": "ansible",
-        "memhog_config": {
-            "memhog_url": "https://mirror.bitflux.ai/repository/downloads/tools/memhog",
-            "memhog_path": "/usr/bin/memhog"
-        },
-        "installer_config": {
-            "installer_url": "https://mirror.bitflux.ai/repository/downloads/tools/installbitflux.run",
-            "installer_filename": "installbitflux.run"
-        },
-        "installer_options": {
-            "license": "",
-            "deviceid": "",
-            "overrides": {
-                "bitflux_key_url": "https://mirror.bitflux.ai/repository/keys/keys/bitflux_pub.key",
-                "yum_repo_baseurl": "https://mirror.bitflux.ai/repository/yum/release/rocky/$releasever/$basearch",
-                "apt_repo_url": "https://mirror.bitflux.ai/repository/focalRelease"
-            }
-        }
-    }
-    configs['vagrant_dir'] = os.path.join(basedir, configs['vagrant_dir'])
-    configs['ansible_dir'] = os.path.join(basedir, configs['ansible_dir'])
-    configs['vagrant_template'] = os.path.join(basedir, configs['vagrant_template'])
-    configs['vagrant_definition'] = os.path.join(basedir, configs['vagrant_definition'])
+    configs, installer_config, installer_options = setup_config(basedir, args)
     print(configs)
 
     # Make machines.yaml file for vagrant_tools
@@ -246,58 +369,26 @@ if __name__ == '__main__':
     # create and start vm
     vagrant_tools(configs, args, "vm_create.sh")
 
-    # form inputs for ansible installer script
-    installer_config = helper__deepcopy(configs['installer_config'])
-    installer_options = helper__deepcopy(configs['installer_options'])
-    if args.key is not None:
-        installer_options['overrides']['bitflux_key_url'] = args.key
-    if args.license is not None:
-        installer_options['license'] = args.license
-    if args.deviceid is not None:
-        installer_options['deviceid'] = args.deviceid
-    if args.no_grub_update is None:
-        installer_options['grub_update'] = ''
+    # Update repos to get latest entries
+    do_ansible(configs, "update_repos.yml", args)
 
     # Some target machines don't have python installed
     do_ansible(configs, "install_python3.yml", args)
 
-    if args.tarballkernel is not None:
-        # Runs script with ansible to install kernel with a tarball
-        installer_options['nokernel'] = ''
-        installer_config['tarball'] = args.tarballkernel
-        run_cmd("mc cp {} latest.tar.gz".format(args.tarballkernel))
-        ansible_bitflux_install(configs, "install_tarballkernel.yml", args, installer_config, installer_options)
-    elif args.pkgrepokernel is not None:
-        # Runs script with ansible to install kernel
-        installer_options['nocollector'] = ''
-        installer_options['overrides']['apt_repo_url'] = args.pkgrepokernel
-        installer_options['overrides']['yum_repo_baseurl'] = args.pkgrepokernel
-        ansible_bitflux_install(configs, "install_bitflux.yml", args, installer_config, installer_options)
-        # Set options to install collector in next round
-        del installer_options['nocollector']
-        installer_options['nokernel'] = ''
+    # Install the kernel packages
+    install_kernel(args, configs, installer_options, installer_config)
 
-    if args.pkgrepo is not None:
-        installer_options['overrides']['apt_repo_url'] = args.pkgrepo
-        installer_options['overrides']['yum_repo_baseurl'] = args.pkgrepo
+    # Install collector packages
+    install_collector(args, configs, installer_options, installer_config)
 
-    if args.tarballcollector is not None:
-        # Runs script with ansible to install bitflux collector with a tarball
-        run_cmd("mc cp {} latest.tar.gz".format(args.tarballcollector))
-        a = {}
-        for k in ['license', 'deviceid']:
-            a[k] = installer_options[k]
-        ansible_bitflux_install(configs, "install_tarballbitflux.yml", args, a, {})
-    else:
-        # Runs script with ansible to install bitflux collector
-        ansible_bitflux_install(configs, "install_bitflux.yml", args, installer_config, installer_options)
-
+    # Some modes don't autoload module
     if args.manual_modprobe:
         do_ansible_adhoc(configs, args, "sudo modprobe swaphints")
 
+    # Set up memhog to make swapping test easier
     ansible_memhog_install(configs, args, configs['memhog_config'])
 
-    # Testing
+    # No do the actual testing
     retval = run_tests(configs, args, 10)
 
     # create and start vm

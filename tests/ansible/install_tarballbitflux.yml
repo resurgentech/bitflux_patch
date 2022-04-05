@@ -17,15 +17,5 @@
     shell: "sed -i \"s/licensekey.*/licensekey={{ license }}/g\" /opt/bitflux/config/bitflux/bitfluxcollector.conf"
   - name: Change deviceid
     shell: "sed -i \"s/deviceid.*/deviceid={{ deviceid }}/g\" /opt/bitflux/config/bitflux/bitfluxcollector.conf"
-  - name: Reboot the server
-    shell: "reboot"
-    async: 1
-    poll: 0
-  - name: Wait for the reboot and reconnect
-    wait_for:
-      port: 22
-      host: '{{ (ansible_ssh_host|default(ansible_host))|default(inventory_hostname) }}'
-      search_regex: OpenSSH
-      delay: 10
-      timeout: 90
-    connection: local
+  - name: reboot
+    reboot:
