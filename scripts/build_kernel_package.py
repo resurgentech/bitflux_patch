@@ -11,7 +11,7 @@ if __name__ == '__main__':
     parser.add_argument('--buildnumber', help='Adds to package name to increment it', default="11", type=str)
     parser.add_argument('--kernel_version', help='kernel version', type=str)
     parser.add_argument('--build_type', help='Hacks for patching and building test [distro, file, git]', default='distro', type=str)
-    parser.add_argument('--build_style', help='which package style [rpm, deb]', default='deb', type=str)
+    parser.add_argument('--style', help='which package style [rpm, deb]', default='deb', type=str)
     parser.add_argument('--image_searchfactors', help='For .deb, find the kernel package', default='["^linux-image-unsigned-", "generic$"]', type=str)
     parser.add_argument('--ver_ref_pkg', help='For .deb, reference pkg search', default='linux-image-unsigned', type=str)
     parser.add_argument('--pkg_filters', help='For .deb, which pkgs to deal with', default='["hwe", "cloud", "dkms", "tools", "buildinfo"]', type=str)
@@ -36,8 +36,8 @@ if __name__ == '__main__':
         test_git_build(args)
         sys.exit(0)
 
-    if args.build_style == 'deb':
+    if args.style == 'deb':
         debian_style_build(args)
-    elif args.build_style == 'rpm':
+    elif args.style == 'rpm':
         rpm_style_build(args)
 
