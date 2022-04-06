@@ -9,7 +9,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--distro', help='Linux distro', type=str)
     parser.add_argument('--image_searchfactors', help='For .deb, find the kernel package', default='["^linux-image-unsigned-", "generic$"]', type=str)
-    parser.add_argument('--build_style', help='which package style [rpm, deb]', default='deb', type=str)
+    parser.add_argument('--style', help='which package style [rpm, deb]', default='deb', type=str)
     parser.add_argument('--verbose', help='verbose', action='store_true')
 
     args, unknown = parser.parse_known_args()
