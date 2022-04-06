@@ -14,9 +14,9 @@ if __name__ == '__main__':
 
     args, unknown = parser.parse_known_args()
 
-    if args.build_style == 'deb':
+    if args.style == 'deb':
         image_name = get_package_deb(args)
-    elif args.build_style == 'rpm':
+    elif args.style == 'rpm':
         image_name = get_package_dnf(args)
     print()
     print()
