@@ -149,7 +149,7 @@ def install_collector(args, configs, installer_options, installer_config):
         ansible_bitflux_install(configs, "install_bitflux.yml", args, installer_config, installer_options)
 
 
-def do_kernel_packages(configs, args, params, expected):
+def do_check_packages(configs, args, params, expected):
     exitcode, out, err = do_ansible_adhoc(configs, args, "cat /etc/redhat-release")
     build_style = 'redhat' if exitcode == 0 else 'debian'
     exitcode, out, err = do_ansible_adhoc(configs, args, params[build_style]['cmd'])
