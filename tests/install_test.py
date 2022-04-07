@@ -192,7 +192,7 @@ def get_kernel_packages(configs, args):
     m = re.findall(re_str, out)
     rev = m[-1]
     if args.collector_revision != rev:
-        print("actual: {} expected: {}".format(rev, args.collector_revision))
+        print("actual: {} expected: {}".format(rev, args.kernel_revision))
         return 1
     return 0
 
