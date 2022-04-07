@@ -149,65 +149,56 @@ def install_collector(args, configs, installer_options, installer_config):
         ansible_bitflux_install(configs, "install_bitflux.yml", args, installer_config, installer_options)
 
 
-def get_collector_packages(configs, args):
+def do_kernel_packages(configs, args, params, expected):
     exitcode, out, err = do_ansible_adhoc(configs, args, "cat /etc/redhat-release")
-    if exitcode == 0:
-        # RedHat style
-        re_str = r'\S+\s+([0-9\.\-]+)'
-        cmd = "dnf list installed bitfluxcollector"
-    else:
-        # Debian style
-        re_str = r'\S+\s+([0-9\.\-]+)+\s+\S+\s+\[installed'
-        cmd = "apt list bitfluxcollector -a"
-    exitcode, out, err = do_ansible_adhoc(configs, args, cmd)
+    build_style = 'redhat' if exitcode == 0 else 'debian'
+    exitcode, out, err = do_ansible_adhoc(configs, args, params[build_style]['cmd'])
     if exitcode != 0:
         print("exitcode: {}".format(exitcode))
         print("stdout: '{}'".format(out))
         print("stderr: '{}'".format(err))
         sys.stdout.flush()
-    m = re.findall(re_str, out)
-    rev = m[-1]
-    if args.collector_revision != rev:
-        print("actual: {} expected: {}".format(rev, args.collector_revision))
-        return 1
-    return 0
-
-
-def get_kernel_packages(configs, args):
-    exitcode, out, err = do_ansible_adhoc(configs, args, "cat /etc/redhat-release")
-    if exitcode == 0:
-        # RedHat style
-        re_str = r'\S+\s+(\S+)'
-        cmd = "dnf list installed kernel-swaphints"
-    else:
-        # Debian style
-        re_str = r'\S+\s+(\S+)\s+\S+\s+\[installed'
-        cmd = "apt list linux-image-swaphints -a"
-    exitcode, out, err = do_ansible_adhoc(configs, args, cmd)
-    if exitcode != 0:
-        print("exitcode: {}".format(exitcode))
-        print("stdout: '{}'".format(out))
-        print("stderr: '{}'".format(err))
-        sys.stdout.flush()
-    m = re.findall(re_str, out)
-    rev = m[-1]
-    if args.collector_revision != rev:
-        print("actual: {} expected: {}".format(rev, args.kernel_revision))
+    m = re.findall(params[build_style]['re'], out)
+    actual = m[-1]
+    if expected != actual:
+        print("actual: {} expected: {}".format(actual, expected))
         return 1
     return 0
 
 
 def check_packages(configs, args):
-    if args.collector_revision is not None:
-        if get_collector_packages(configs, args):
-            print("----------------FAILED COLLECTOR PACKAGE VERSION CHECK-----------------------------", flush=True)
+    test_params = {
+        'kernel': {
+            'redhat': {
+                're': r'\S+\s+(\S+)',
+                'cmd': "dnf list installed kernel-swaphints"
+            },
+            'debian': {
+                're': r'\S+\s+(\S+)\s+\S+\s+\[installed',
+                'cmd': "apt list linux-image-swaphints -a"
+            },
+            'expected': args.kernel_revision
+        },
+        'collector': {
+            'redhat': {
+                're': r'\S+\s+([0-9\.\-]+)',
+                'cmd': "dnf list installed bitfluxcollector"
+            },
+            'debian': {
+                're': r'\S+\s+([0-9\.\-]+)+\s+\S+\s+\[installed',
+                'cmd': "apt list bitfluxcollector -a"
+            },
+            'expected': args.collector_revision
+        }
+    }
+    for name, params in test_params.items():
+        expected = params['expected']
+        if expected is None:
+            continue
+        if do_check_packages(configs, args, params, expected):
+            print("----------------FAILED {} PACKAGE VERSION CHECK-----------------------------".format(name), flush=True)
             return 1
-        print("++++++++++++++++PASSED COLLECTOR PACKAGE VERSION CHECK++++++++++++++++++++++++++++", flush=True)
-    if args.kernel_revision is not None:
-        if get_kernel_packages(configs, args):
-            print("----------------FAILED KERNEL PACKAGE VERSION CHECK-----------------------------", flush=True)
-            return 1
-        print("++++++++++++++++PASSED KERNEL PACKAGE VERSION CHECK++++++++++++++++++++++++++++", flush=True)
+        print("++++++++++++++++PASSED {} PACKAGE VERSION CHECK++++++++++++++++++++++++++++".format(name), flush=True)
     return 0
 
 
