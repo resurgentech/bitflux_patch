@@ -4,14 +4,14 @@ from .common import *
 from .patching import *
 
 
-def git_checkout_kernel(build_dir, kernel_branch, giturl, gitmirrorpath):
+def git_checkout_kernel(build_dir, kernel_branch, giturl, git_ref_urls_path):
     branch_filepath = os.path.join(build_dir, kernel_branch)
     filepath = os.path.join(build_dir, kernel_branch)
     run_cmd("rm -rf {}".format(branch_filepath), verbose=False)
     sys.stdout.flush()
     run_cmd("mkdir -p {}".format(build_dir), verbose=False)
-    print("Checkout branch '{}' from '{}'".format(kernel_branch, gitmirrorpath))
-    run_cmd("git clone {} --reference-if-able {} {}".format(giturl, gitmirrorpath, branch_filepath), verbose=False)
+    print("Checkout branch '{}' from '{}'".format(kernel_branch, git_ref_urls_path))
+    run_cmd("git clone {} --reference-if-able {} {}".format(giturl, git_ref_urls_path, branch_filepath), verbose=False)
     run_cmd("git fetch --all", workingdir=filepath, verbose=False)
     run_cmd("git checkout origin/{}".format(kernel_branch), workingdir=filepath, verbose=False)
     if kernel_branch == "master":
@@ -29,7 +29,7 @@ def test_git_build(args):
     kernel_version = args.kernel_version
     build_dir = "./build"
 
-    kernel_version, src_dir = git_checkout_kernel(build_dir, kernel_version, args.giturl, args.gitmirrorpath)
+    kernel_version, src_dir = git_checkout_kernel(build_dir, kernel_version, args.giturl, args.git_ref_urls_path)
 
     # Match up the patch directory
     patches_dir = select_patches_dir(kernel_version, verbose=args.verbose)
