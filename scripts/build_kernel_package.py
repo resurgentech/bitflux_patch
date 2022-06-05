@@ -20,7 +20,7 @@ if __name__ == '__main__':
     parser.add_argument('--clean', help='Extra clean up steps', action='store_true')
     parser.add_argument('--verbose', help='verbose', action='store_true')
     parser.add_argument('--git_ref_urls_path', help='Requires path to git mirror.', default='/opt/mirrors/linux-stable.git', type=str)
-    parser.add_argument('--giturl', help='git repo url', default='https://github.com/gregkh/linux.git', type=str)
+    parser.add_argument('--giturl', help='git repo url', default='https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git', type=str)
 
     args = parser.parse_args()
 
