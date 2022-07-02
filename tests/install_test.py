@@ -263,10 +263,12 @@ def swapping(configs, args):
     swaptotal = 0
     swapfree = 0
     for l in out.splitlines():
+        print("l={}".format(l))
         b = l.split()
-        if b[0] == 'SwapTotal:':
+        print("b={}".format(b))
+        if b[0].find('SwapTotal:') != -1:
             swaptotal = int(b[1])
-        elif b[0] == 'SwapFree:':
+        elif b[0].find('SwapFree:') != -1:
             swapfree = int(b[1])
     swapped = swaptotal - swapfree
     # Do we see any pages swapped we'll settle for 500K
