@@ -58,7 +58,7 @@ def run_system(cmd, workingdir=None, allow_errors=False, verbose=False):
     return exitcode
 
 
-def run_cmd(cmd, shell=True, workingdir=None, allow_errors=False, verbose=False, live_output=False):
+def run_cmd(cmd, shell=True, workingdir=None, allow_errors=False, verbose=False, live_output=False, no_stdout=False):
     """
     run a command in the shell
 
@@ -75,7 +75,7 @@ def run_cmd(cmd, shell=True, workingdir=None, allow_errors=False, verbose=False,
         cmd = "cd {}; {}".format(workingdir, cmd)
         shell = True
     sources, replicas = zip(pty.openpty(), pty.openpty())
-    if verbose:
+    if verbose or live_output:
         print("cmd: {}".format(cmd))
     if not shell and isinstance(cmd, str):
         cmd = cmd.split()
@@ -116,14 +116,16 @@ def run_cmd(cmd, shell=True, workingdir=None, allow_errors=False, verbose=False,
     out = b"".join(aout)
     err = b"".join(aerr)
     if verbose:
-        print("stdout: {}".format(out))
+        if not no_stdout:
+            print("stdout: {}".format(out))
         print("stderr: {}".format(err))
         print("exitcode: {}".format(exitcode))
         print("")
     if allow_errors is False and exitcode != 0:
         if not verbose:
             print("cmd: {}".format(cmd))
-            print("stdout: {}".format(out))
+            if not no_stdout:
+                print("stdout: {}".format(out))
             print("stderr: {}".format(err))
             print("exitcode: {}".format(exitcode))
             print("")

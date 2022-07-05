@@ -145,7 +145,30 @@ def deb_hack_changelog(bitflux_version, src_dir, buildnum=None, verbose=True, cl
     sleep(1)
 
 
+def deb_hack_abi_records(flavour, src_dir, verbose=True):
+    '''
+    Copies debian.master/abi/amd64/generic* to debian.master/abi/amd64/'flavour'*
+    Because the build wants them to check stuff from the previous build
+    '''
+    abi_dir = os.path.join(src_dir,'debian.master','abi','amd64')
+    filelist = [f.path for f in os.scandir(abi_dir) if not f.is_dir()]
+    for f in filelist:
+        a = os.path.basename(f)
+        b = a.split('generic')
+        if len(b) == 0:
+            continue
+        b[0] = flavour
+        c = ''.join(b)
+        d = os.path.dirname(f)
+        newf = os.path.join(d,c)
+        print("src={}  dst={}".format(f, newf))
+        shutil.copyfile(f, newf)
+
+
 def deb_set_flavour(flavour, debian_dir, allow_errors=False, verbose=False):
+    '''
+    Generates flavour specific files for our new flavour
+    '''
     file_pair = [
         ['config/amd64/config.flavour.generic', 'config/amd64/config.flavour.{}'.format(flavour)],
         ['control.d/generic.inclusion-list', 'control.d/{}.inclusion-list'.format(flavour)],
@@ -181,20 +204,15 @@ def build_debs(src_dir, allow_errors=False, verbose=False, live_output=True):
 
     :param path: path with kernel sources to build
     """
+    printfancy("debian clean", timeout=3)
     run_cmd("LANG=C fakeroot debian/rules clean", workingdir=src_dir, allow_errors=allow_errors, verbose=verbose, live_output=live_output)
-    print("--debian clean--")
-    sys.stdout.flush()
-    sleep(3)
+
+    printfancy("debian control", timeout=3)
     run_cmd("LANG=C fakeroot debian/rules debian/control", workingdir=src_dir, allow_errors=allow_errors, verbose=verbose, live_output=live_output)
-    print("--debian contrl--")
-    sys.stdout.flush()
-    sleep(3)
-    #run_cmd("LANG=C fakeroot debian/rules binary", workingdir=src_dir, allow_errors=allow_errors, verbose=verbose, live_output=live_output)
-    # Build system hates not having a tty or something, run_cmd() fails
+
+    printfancy("debian binary")
     cmd = "LANG=C fakeroot debian/rules binary"
-    cmd += " skipabi=true skipmodule=true skipretpoline=true"
-    cmd += " skipdbg=true disable_d_i=true"
-    run_cmd(cmd, workingdir=src_dir, allow_errors=allow_errors, verbose=verbose, live_output=live_output)
+    run_cmd(cmd, workingdir=src_dir, allow_errors=allow_errors, verbose=verbose, live_output=live_output, no_stdout=True)
 
 
 def filter_pkg_for_meta_pkg(pkg_filters, filename):
@@ -234,7 +252,7 @@ def build_meta_pkg(ver_ref_pkg, pkg_filters, metapkg_template, allow_errors=Fals
     with open('./build/{}'.format(metapkg_template), "w") as file_:
         file_.write(templateoutput)
     # Actually make metapkg
-    run_cmd("equivs-build {}".format(metapkg_template), workingdir="./build", allow_errors=allow_errors, verbose=verbose)
+    run_cmd("equivs-build {}".format(metapkg_template), workingdir="./build", allow_errors=allow_errors, verbose=verbose, no_stdout=True)
 
 
 # Find package without building
@@ -254,65 +272,70 @@ def get_package_deb(args):
     return image_name
 
 
+def printfancy(str, timeout=0.1):
+    print('------------------------------------------------------------------------------')
+    print('--- {}'.format(str))
+    print('------------------------------------------------------------------------------')
+    sys.stdout.flush()
+    sleep(timeout)
+
+
 def debian_style_build(args):
     image_searchfactors = json.loads(args.image_searchfactors)
     ver_ref_pkg = args.ver_ref_pkg
     pkg_filters = json.loads(args.pkg_filters)
     metapkg_template = args.metapkg_template
-    print("BUILDING DEBIAN STYLE PACKAGE")
+    printfancy("BUILDING DEBIAN STYLE PACKAGE")
 
     # Update and upgrade apt repos to latest
-    print("update and upgrade apt repos...")
+    printfancy("update and upgrade apt repos...")
     apt_update_upgrade(allow_errors=True)
-    print("DONE - apt repos updated and upgraded")
-    sys.stdout.flush()
-    sleep(3)
+    printfancy("DONE - apt repos updated and upgraded", timeout=3)
 
     bitflux_version = get_bitflux_version()
-    print("Set bitflux_version:        {}".format(bitflux_version))
-    sys.stdout.flush()
-    sleep(2)
+    printfancy("Set bitflux_version:        {}".format(bitflux_version), timeout=3)
 
     # Return the newest latest linux kernel image package name
     image_name = apt_get_linux_image_name(image_searchfactors, verbose=args.verbose)
-    print("Found image name:           {}".format(image_name))
-    sys.stdout.flush()
+    printfancy("Found image name:           {}".format(image_name))
 
     # Search patches for something that should match the kernel image package
     patches_dir = select_patches_dir(image_name, patches_root_dir='./patches')
-    print("Found patches directory:    {}".format(patches_dir))
-    sys.stdout.flush()
+    printfancy("Found patches directory:    {}".format(patches_dir))
     if patches_dir is None:
         raise
 
     # Download source code and return where the kernel source code is located
     src_dir = apt_get_source(image_name, verbose=args.verbose)
-    print("Found kernel src directory: {}".format(src_dir))
-    sys.stdout.flush()
+    printfancy("Found kernel src directory: {}".format(src_dir))
 
     debian_dir = deb_find_debian_dir(src_dir)
-    print("Found DEBIAN directory: {}".format(debian_dir))
-    sys.stdout.flush()
+    printfancy("Found DEBIAN directory: {}".format(debian_dir))
 
     # Do patching steps
     init_commit = patch_in(args.distro, patches_dir, src_dir, verbose=args.verbose, clean_patch=True)
 
+    printfancy("Creating flavour swaphints config files")
     deb_set_flavour('swaphints', debian_dir, verbose=True)
     commit_and_create_patch('flavour', src_dir, verbose=True)
 
     if init_commit is not None:
         filepath = os.path.join(patches_dir, "complete.patch")
         commit_and_create_patch(filepath, src_dir, commit_hash=init_commit, verbose=args.verbose)
-    print("Patching Complete")
-    sys.stdout.flush()
-    sleep(3)
+    printfancy("Patching Complete", timeout=3)
 
+    printfancy("Modifying debian changelog")
     deb_hack_changelog(bitflux_version, src_dir, buildnum=args.buildnumber, verbose=args.verbose, clean_patch=True)
+
+    printfancy("Mocking out current abi files")
+    deb_hack_abi_records('swaphints', src_dir, verbose=args.verbose)
 
     # Build deb packages
     if args.nobuild:
         return
+    printfancy("Build .deb files")
     build_debs(src_dir, verbose=args.verbose)
+    printfancy("Build meta_pkg .deb")
     build_meta_pkg(ver_ref_pkg, pkg_filters, metapkg_template)
 
     # Copy outputs

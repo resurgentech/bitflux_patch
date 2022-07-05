@@ -66,7 +66,10 @@ class KernelBuilder:
         cmd += " {}".format(self.config['image_name'])
         cmd += " python3 {}".format(script)
         for k,v in self.config['settings'].items():
-            cmd += " --{} {}".format(k,v)
+            if v is True:
+                cmd += " --{}".format(k)
+            else:
+                cmd += " --{} {}".format(k,v)
         self.run_cmd(cmd)
 
     def build_kernel_package(self):
@@ -154,6 +157,8 @@ if __name__ == '__main__':
     else:
         config['docker_image'] = config['settings']['docker_image']
         del config['settings']['docker_image']
+
+    print(config)
 
     # Only check for kernel
     if args.checkonly:
