@@ -18,9 +18,9 @@ class KernelBuilder:
     def __init__(self, config):
         self.config = config
 
-    def run_cmd(self, cmd, verbose=None, live_output=True):
+    def run_cmd(self, cmd, verbose=None, live_output=True, no_stdout=False):
         lverbose = verbose if verbose is not None else self.config['verbose']
-        return run_cmd(cmd, verbose=lverbose, live_output=live_output)
+        return run_cmd(cmd, verbose=lverbose, live_output=live_output, no_stdout=no_stdout)
 
     def build(self):
         self.build_docker_image()
@@ -53,7 +53,7 @@ class KernelBuilder:
         self.run_cmd("docker build -f Dockerfile . --tag {}".format(self.config['image_name']))
         self.run_cmd("rm -f Dockerfile")
 
-    def run_docker(self, script):
+    def run_docker(self, script, no_stdout=False):
         cmd = "docker run"
         cmd += " --privileged"
         cmd += " --name {}".format(self.config['container_name'])
@@ -70,19 +70,19 @@ class KernelBuilder:
                 cmd += " --{}".format(k)
             else:
                 cmd += " --{} {}".format(k,v)
-        self.run_cmd(cmd)
+        self.run_cmd(cmd, no_stdout=no_stdout)
 
     def build_kernel_package(self):
         print("==============================================================================")
         print("=== BUILD KERNEL PACKAGE =====================================================")
         print("==============================================================================")
-        self.run_docker("./scripts/build_kernel_package.py")
+        self.run_docker("./scripts/build_kernel_package.py", no_stdout=True)
 
     def check_kernel_package(self):
         print("==============================================================================")
         print("=== CHECK KERNEL PACKAGE =====================================================")
         print("==============================================================================")
-        self.run_docker("./scripts/check_package.py")
+        self.run_docker("./scripts/check_package.py", no_stdout=True)
 
     def copy_output_from_container(self):
         print("==============================================================================")

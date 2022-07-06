@@ -145,12 +145,12 @@ def deb_hack_changelog(bitflux_version, src_dir, buildnum=None, verbose=True, cl
     sleep(1)
 
 
-def deb_hack_abi_records(flavour, src_dir, verbose=True):
+def deb_hack_abi_records(flavour, debian_dir, verbose=True):
     '''
     Copies debian.master/abi/amd64/generic* to debian.master/abi/amd64/'flavour'*
     Because the build wants them to check stuff from the previous build
     '''
-    abi_dir = os.path.join(src_dir,'debian.master','abi','amd64')
+    abi_dir = os.path.join(debian_dir, 'abi','amd64')
     filelist = [f.path for f in os.scandir(abi_dir) if not f.is_dir()]
     for f in filelist:
         a = os.path.basename(f)
@@ -328,7 +328,7 @@ def debian_style_build(args):
     deb_hack_changelog(bitflux_version, src_dir, buildnum=args.buildnumber, verbose=args.verbose, clean_patch=True)
 
     printfancy("Mocking out current abi files")
-    deb_hack_abi_records('swaphints', src_dir, verbose=args.verbose)
+    deb_hack_abi_records('swaphints', debian_dir, verbose=args.verbose)
 
     # Build deb packages
     if args.nobuild:
