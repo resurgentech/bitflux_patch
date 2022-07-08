@@ -18,6 +18,9 @@ if __name__ == '__main__':
         image_name = get_package_deb(args)
     elif args.style == 'rpm':
         image_name = get_package_dnf(args)
+    elif args.style == 'yum':
+        image_name = get_package_yum(args)
+
     print()
     print()
     print("package={}".format(image_name))

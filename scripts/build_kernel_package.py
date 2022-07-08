@@ -40,4 +40,6 @@ if __name__ == '__main__':
         debian_style_build(args)
     elif args.style == 'rpm':
         rpm_style_build(args)
+    elif args.style == 'yum':
+        yum_style_build(args)
 

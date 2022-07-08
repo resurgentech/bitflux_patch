@@ -47,7 +47,8 @@ class KernelBuilder:
         template_path = os.path.join(self.config['basedir'], 'scripts', 'Dockerfile.j2')
         output_path = os.path.join(self.config['basedir'], 'Dockerfile')
         compile_j2_template(template_path, output_path, self.config)
-        self.run_cmd("docker pull {}".format(self.config['docker_image']))
+        if self.config.get('nopull', None) is None:
+            self.run_cmd("docker pull {}".format(self.config['docker_image']))
         self.run_cmd("docker rm --force {}".format(self.config['container_name']))
         self.run_cmd("docker rmi --force {}".format(self.config['image_name']))
         self.run_cmd("docker build -f Dockerfile . --tag {}".format(self.config['image_name']))
@@ -126,6 +127,7 @@ if __name__ == '__main__':
     parser.add_argument('--checkonly', help='Return the kernel package name', action='store_true')
     parser.add_argument('--verbose', help='Verbose mode - DEBUG', action='store_true')
     parser.add_argument('--dumpall', help='Dump everything from the container - DEBUG', action='store_true')
+    parser.add_argument('--nopull', help="Use local docker images, don't pull - DEBUG", action='store_true')
     parser.add_argument('--nobuild', help="Don't build - DEBUG", action='store_true')
     parser.add_argument('--clean', help='Extra clean up steps - DEBUG', action='store_true')
     parser.add_argument('--settings', help='Overrides for building in escaped json', type=str)
@@ -139,6 +141,8 @@ if __name__ == '__main__':
     config['verbose'] = args.verbose
     if args.dumpall:
         config['dumpall'] = args.dumpall
+    if args.nopull:
+        config['nopull'] = args.nopull
     if args.settings is None:
         config['settings'] = {}
     else:
