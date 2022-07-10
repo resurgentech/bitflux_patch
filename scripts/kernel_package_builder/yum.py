@@ -176,15 +176,13 @@ def yum_hack_srpm_specfile(bitflux_version, pkg_release, patchfile_path, rpm_top
     # pkg_release NOTE: doesn't seem to do much
     cmd = "sed -i 's/%define pkg_release [[:digit:]]\+%/%define pkg_release {}%/' {}".format(pkg_release, specfile)
     run_cmd(cmd, allow_errors=allow_errors, verbose=verbose)
-    # Delete NoSource... if there.
-    cmd = "sed -i '/NoSource: 0/d' {}".format(specfile)
-    run_cmd(cmd, allow_errors=allow_errors, verbose=verbose)
     # Splice patch into specfile
-    cmd = "sed -i '/Patches./a Patch8000: demandswapping.patch' {}".format(specfile)
+    cmd = "sed -i '/^BuildRoot/i Patch8000: demandswapping.patch' {}".format(specfile)
     run_cmd(cmd, allow_errors=allow_errors, verbose=verbose)
-    cmd = "sed -i '/# END OF PATCH APPLICATIONS/i ApplyOptionalPatch demandswapping.patch' {}".format(specfile)
+    cmd = "sed -i '/# Any further pre-build tree manipulations happen here/i ApplyPatch demandswapping.patch' {}".format(specfile)
     run_cmd(cmd, allow_errors=allow_errors, verbose=verbose)
     return specfile
+
 
 def yum_generate_srpm_config_local(bitflux_version, pkg_release, patchfile_path, rpm_topdir, allow_errors=False, verbose=False):
 #    from jinja2 import Template
@@ -200,10 +198,9 @@ def yum_generate_srpm_config_local(bitflux_version, pkg_release, patchfile_path,
     #This is bringing a gun to a knife fight
     files = os.listdir("{}/SOURCES/.".format(rpm_topdir))
     for file in files:
-        if "x86_64" in file:
-            if file.endswith(".config"):
-                cmd = "sed -i '/# CONFIG_IDLE_PAGE_TRACKING is not set/cCONFIG_IDLE_PAGE_TRACKING=y' {}/SOURCES/{}".format(rpm_topdir,file)
-                run_cmd(cmd, allow_errors=allow_errors, verbose=verbose)
+        if file == "config-x86_64":
+            cmd = "sed -i '/# CONFIG_IDLE_PAGE_TRACKING is not set/cCONFIG_IDLE_PAGE_TRACKING=y' {}/SOURCES/{}".format(rpm_topdir,file)
+            run_cmd(cmd, allow_errors=allow_errors, verbose=verbose)
 
 
 def get_package_yum(args):
