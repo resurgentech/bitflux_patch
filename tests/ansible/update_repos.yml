@@ -5,6 +5,9 @@
   - name: dnf style
     shell: dnf clean all
     ignore_errors: true
+  - name: yum style
+    shell: yum clean all
+    ignore_errors: true
   - name: apt style
     shell: apt-get update
     ignore_errors: true
