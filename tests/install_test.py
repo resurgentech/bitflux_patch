@@ -169,6 +169,8 @@ def do_check_packages(configs, args, params, expected):
         sys.stdout.flush()
     m = re.findall(params[build_style]['re'], out)
     actual = m[-1]
+    print(m)
+    print("stdout: '{}'".format(out))
     if expected != actual:
         print("actual: {} expected: {}".format(actual, expected))
         return 1
@@ -183,7 +185,7 @@ def check_packages(configs, args):
                 'cmd': "dnf list installed kernel-swaphints"
             },
             'amazon': {
-                're': r'\S+\s+(\S+)',
+                're': r'\S+\s+\S+\s+(\S+)',
                 'cmd': "yum list installed kernel-swaphints"
             },
             'debian': {
@@ -390,6 +392,9 @@ if __name__ == '__main__':
 
     # Install collector packages
     install_collector(args, configs, installer_options, installer_config)
+
+    # Create swapfile if necessary
+    do_ansible(configs, "set_swapfile.yml", args)
 
     # Some modes don't autoload module
     if args.manual_modprobe:
