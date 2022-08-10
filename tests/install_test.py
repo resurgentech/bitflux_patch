@@ -53,7 +53,8 @@ def ansible_bitflux_install(configs, script, args, installer_config, installer_o
     options = ""
     for k,v in installer_options.items():
         if k == "overrides":
-            options += " --{} {}".format(k, json.dumps(json.dumps(v)))
+            if len(v) > 0:
+                options += " --{} {}".format(k, json.dumps(json.dumps(v)))
             continue
         options += " --{} {}".format(k, v)
     installer_config['installer_options'] = options
@@ -88,11 +89,7 @@ def setup_config(basedir, args):
         "installer_options": {
             "license": "",
             "deviceid": "",
-            "overrides": {
-                "bitflux_key_url": "https://mirror.bitflux.ai/repository/keys/keys/bitflux_pub.key",
-                "yum_repo_baseurl": "https://mirror.bitflux.ai/repository/yum/release/rocky/$releasever/$basearch",
-                "apt_repo_url": "https://mirror.bitflux.ai/repository/focalRelease"
-            }
+            "overrides": {}
         }
     }
     configs['vagrant_dir'] = os.path.join(basedir, configs['vagrant_dir'])
@@ -110,6 +107,8 @@ def setup_config(basedir, args):
         installer_options['deviceid'] = args.deviceid
     if args.no_grub_update is None:
         installer_options['grub_update'] = ''
+    if args.installer_url is not None:
+        installer_config["installer_url"] = args.installer_url
 
     return configs, installer_config, installer_options
 
@@ -282,21 +281,20 @@ def swapping(configs, args):
     swaptotal = 0
     swapfree = 0
     for l in out.splitlines():
-        print("l={}".format(l))
         b = l.split()
-        print("b={}".format(b))
         if b[0].find('SwapTotal:') != -1:
             swaptotal = int(b[1])
         elif b[0].find('SwapFree:') != -1:
             swapfree = int(b[1])
     swapped = swaptotal - swapfree
-    # Do we see any pages swapped we'll settle for 500K
-    if swapped < 500:
+    # Do we see any pages swapped we'll settle for 10M
+    if swapped < 10000:
         print("swapped: {} swaptotal: {} swapfree: {}".format(swapped, swaptotal, swapfree))
-        print("stdout: '{}'".format(out))
-        print("stderr: '{}'".format(err))
+        #print("stdout: '{}'".format(out))
+        #print("stderr: '{}'".format(err))
         sys.stdout.flush()
         return 0
+    print("swapped: {} swaptotal: {} swapfree: {}".format(swapped, swaptotal, swapfree))
     return 1
 
 
@@ -331,6 +329,7 @@ def run_tests(configs, args, loops):
     for i in range(loops):
         sleep(60)
         passed = swapping(configs, args)
+        print("passed={}  i={}".format(passed, i))
         if passed:
             print("++++++++++++++++PASSED SWAPPING CHECK++++++++++++++++++++++++++++", flush=True)
             return 0
@@ -357,6 +356,7 @@ if __name__ == '__main__':
     parser.add_argument('--tarballcollector', help='Install collector from tarball from minio', type=str)
     parser.add_argument('--collector_revision', help='Collector revision to confirm install', type=str)
     parser.add_argument('--kernel_revision', help='kernel revision to confirm install', type=str)
+    parser.add_argument('--installer_url', help='override installer url', type=str)
 
     args = parser.parse_args()
 
