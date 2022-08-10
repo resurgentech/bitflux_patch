@@ -39,7 +39,7 @@ def test_git_build(args):
         raise
 
     # Go ahead and do patching of kernel sources
-    init_commit = patch_in(args.distro, patches_dir, src_dir, verbose=args.verbose, clean_patch=True)
+    init_commit = patch_in("gitbuild", patches_dir, src_dir, verbose=args.verbose, clean_patch=True)
 
     if init_commit is not None:
         filepath = os.path.join(patches_dir, "complete.patch")
