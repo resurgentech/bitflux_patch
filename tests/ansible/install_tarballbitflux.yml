@@ -14,8 +14,8 @@
   - name: Install bitflux collector
     shell: cd /tmp/latest/; apt install -y $(ls *.deb | sed 's/^/.\//')
   - name: Change license key
-    shell: "sed -i \"s/licensekey.*/licensekey={{ license }}/g\" $( if [ -f '/opt/bitflux/config/bitflux/bitfluxcollector.conf' ]; then echo '/opt/bitflux/config/bitflux/bitfluxcollector.conf'; else echo '/lib/systemd/system/bitflux.service'; fi )"
+    shell: "sed -i \"s/licensekey.*/licensekey={{ license }}/g\" $( if [ -f '/opt/bitflux/config/bitflux/bitfluxcollector.conf' ]; then echo '/opt/bitflux/config/bitflux/bitfluxcollector.conf'; else echo '/etc/bitflux/config/bitflux.conf'; fi )"
   - name: Change deviceid
-    shell: "sed -i \"s/deviceid.*/deviceid={{ deviceid }}/g\" $( if [ -f '/opt/bitflux/config/bitflux/bitfluxcollector.conf' ]; then echo '/opt/bitflux/config/bitflux/bitfluxcollector.conf'; else echo '/lib/systemd/system/bitflux.service'; fi )"
+    shell: "sed -i \"s/deviceid.*/deviceid={{ deviceid }}/g\" $( if [ -f '/opt/bitflux/config/bitflux/bitfluxcollector.conf' ]; then echo '/opt/bitflux/config/bitflux/bitfluxcollector.conf'; else echo '/etc/bitflux/config/bitflux.conf'; fi )"
   - name: reboot
     reboot:
