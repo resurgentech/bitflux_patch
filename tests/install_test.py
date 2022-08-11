@@ -368,6 +368,9 @@ def run_tests(configs, args, loops):
             print("++++++++++++++++PASSED SWAPPING CHECK++++++++++++++++++++++++++++", flush=True)
             return 0
     print("----------------FAILED SWAPPING CHECK-----------------------------", flush=True)
+    exitcode, out,err = do_ansible_adhoc(configs, args, "sudo journalctl -u bitflux")
+    print(out)
+    print(err)
     return 1
 
 
