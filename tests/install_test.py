@@ -24,6 +24,30 @@ def vagrant_tools(configs, args, script):
     sys.stdout.flush()
 
 
+def print_line(a, tag, l):
+    s = a*5
+    s += ' {} '.format(tag)
+    n = len(s)
+    s += a*(l-n)
+    print(s)
+
+
+def print_ansible_output(out):
+    a = re.search(r'=> {', out)
+    b = [ m.start() for m in re.finditer(r'}', out)]
+    d = out[a.end():b[-1]]
+    e = json.loads("{" + d + "}")
+    print_line('-','cmd:',80)
+    print(e['cmd'])
+    print_line('-','exitcode:',80)
+    print(e['rc'])
+    print_line('-','stdout:',80)
+    print(e['stdout'])
+    print_line('-','stderr:',80)
+    print(e['stderr'])
+    print('-'*80)
+
+
 def do_ansible(configs, script, args, extravars=None, interpreter=None):
     ansible_dir = configs['ansible_dir']
     invfile = os.path.join(configs['vagrant_dir'], "inventory.yaml")
@@ -37,8 +61,18 @@ def do_ansible(configs, script, args, extravars=None, interpreter=None):
         cmd += " --extra-vars {}".format(extravars)
     cmd += " {}".format(args.verbosity)
     print("do_ansible: '{}'".format(cmd), flush=True)
-    exitcode, out, err = run_cmd(cmd, live_output=True)
+    exitcode, out, err = run_cmd(cmd, live_output=True, allow_errors=True)
     sys.stdout.flush()
+    if exitcode != 0:
+        print('do_ansible: FAILED')
+        print("="*80)
+        print("exitcode={}".format(exitcode))
+        print("="*80)
+        print("stderr: {}".format(err))
+        print("="*80)
+        print_ansible_output(out)
+        print("="*80)
+        raise
     return exitcode, out, err
 
 
@@ -122,29 +156,29 @@ def install_kernel(args, configs, installer_options, installer_config):
         ansible_bitflux_install(configs, "install_tarballkernel.yml", args, installer_config, installer_options)
     elif args.pkgrepokernel is not None:
         # Runs script with ansible to install kernel
-        installer_options['nocollector'] = ''
+        installer_options['nobitflux'] = ''
         installer_options['overrides']['apt_repo_url'] = args.pkgrepokernel
         installer_options['overrides']['yum_repo_baseurl'] = args.pkgrepokernel
         ansible_bitflux_install(configs, "install_bitflux.yml", args, installer_config, installer_options)
-        # Set options to install collector in next round
-        del installer_options['nocollector']
+        # Set options to install bitflux in next round
+        del installer_options['nobitflux']
         installer_options['nokernel'] = ''
 
 
-def install_collector(args, configs, installer_options, installer_config):
+def install_bitflux(args, configs, installer_options, installer_config):
     if args.pkgrepo is not None:
         installer_options['overrides']['apt_repo_url'] = args.pkgrepo
         installer_options['overrides']['yum_repo_baseurl'] = args.pkgrepo
 
-    if args.tarballcollector is not None:
-        # Runs script with ansible to install bitflux collector with a tarball
-        run_cmd("mc cp {} latest.tar.gz".format(args.tarballcollector))
+    if args.tarballbitflux is not None:
+        # Runs script with ansible to install bitflux bitflux with a tarball
+        run_cmd("mc cp {} latest.tar.gz".format(args.tarballbitflux))
         a = {}
         for k in ['license', 'deviceid']:
             a[k] = installer_options[k]
         ansible_bitflux_install(configs, "install_tarballbitflux.yml", args, a, {})
     else:
-        # Runs script with ansible to install bitflux collector
+        # Runs script with ansible to install bitflux bitflux
         ansible_bitflux_install(configs, "install_bitflux.yml", args, installer_config, installer_options)
 
 
@@ -193,20 +227,20 @@ def check_packages(configs, args):
             },
             'expected': args.kernel_revision
         },
-        'collector': {
+        'bitflux': {
             'redhat': {
                 're': r'\S+\s+([0-9\.\-]+)',
-                'cmd': "dnf list installed bitfluxcollector"
+                'cmd': "dnf list installed bitflux"
             },
             'amazon': {
                 're': r'\S+\s+([0-9\.\-]+)',
-                'cmd': "yum list installed bitfluxcollector"
+                'cmd': "yum list installed bitflux"
             },
             'debian': {
                 're': r'\S+\s+([0-9\.\-]+)+\s+\S+\s+\[installed',
-                'cmd': "apt list bitfluxcollector -a"
+                'cmd': "apt list bitflux -a"
             },
-            'expected': args.collector_revision
+            'expected': args.bitflux_revision
         }
     }
     for name, params in test_params.items():
@@ -235,8 +269,8 @@ def check_for_swaphints(configs, args):
     return 0
 
 
-def check_for_collector(configs, args):
-    cmd = "sudo systemctl status bitfluxcollector -n 0"
+def check_for_bitflux(configs, args):
+    cmd = "sudo systemctl status bitflux -n 0"
     exitcode, out, err = do_ansible_adhoc(configs, args, cmd)
     if exitcode != 0:
         print("exitcode: {}".format(exitcode))
@@ -311,11 +345,11 @@ def run_tests(configs, args, loops):
         return 1
     print("++++++++++++++++PASSED SWAPHINTS CHECK++++++++++++++++++++++++++++", flush=True)
 
-    # check if collector is running
-    if check_for_collector(configs, args):
-        print("----------------FAILED COLLECTOR CHECK-----------------------------", flush=True)
+    # check if bitflux is running
+    if check_for_bitflux(configs, args):
+        print("----------------FAILED bitflux CHECK-----------------------------", flush=True)
         return 1
-    print("++++++++++++++++PASSED COLLECTOR CHECK++++++++++++++++++++++++++++", flush=True)
+    print("++++++++++++++++PASSED bitflux CHECK++++++++++++++++++++++++++++", flush=True)
 
     memhog(configs, args)
     sleep(30)
@@ -353,8 +387,10 @@ if __name__ == '__main__':
     parser.add_argument('--manual_modprobe', help='Force modprobe in script rather than relying on the system settings.', action='store_true')
     parser.add_argument('--verbosity', help='verbose mode for ansible ex. -vvv', default='', type=str)
     parser.add_argument('--tarballkernel', help='Install kernel from tarball from minio', type=str)
-    parser.add_argument('--tarballcollector', help='Install collector from tarball from minio', type=str)
-    parser.add_argument('--collector_revision', help='Collector revision to confirm install', type=str)
+    parser.add_argument('--tarballbitflux', help='Install bitflux from tarball from minio', type=str)
+    parser.add_argument('--tarballcollector', help='[DEPRECATED] Install collector from tarball from minio', type=str)
+    parser.add_argument('--collector_revision', help='[DEPRECATED] Collector revision to confirm install', type=str)
+    parser.add_argument('--bitflux_revision', help='bitflux package revision to confirm install', type=str)
     parser.add_argument('--kernel_revision', help='kernel revision to confirm install', type=str)
     parser.add_argument('--installer_url', help='override installer url', type=str)
 
@@ -368,6 +404,14 @@ if __name__ == '__main__':
     # default and configs
     configs, installer_config, installer_options = setup_config(basedir, args)
     print(configs)
+
+    #DEPRECATED
+    if args.collector_revision is not None:
+        args.bitflux_revision = args.collector_revision
+        print("--collector_revision is deprecated")
+    if args.tarballcollector is not None:
+        args.tarballbitflux = args.tarballcollector
+        print("--tarballcollector is deprecated")
 
     # Make machines.yaml file for vagrant_tools
     create_vagrant_tools_file(configs, args.vagrant_box, args.machine_name)
@@ -390,8 +434,8 @@ if __name__ == '__main__':
     # Install the kernel packages
     install_kernel(args, configs, installer_options, installer_config)
 
-    # Install collector packages
-    install_collector(args, configs, installer_options, installer_config)
+    # Install bitflux packages
+    install_bitflux(args, configs, installer_options, installer_config)
 
     # Create swapfile if necessary
     do_ansible(configs, "set_swapfile.yml", args)
