@@ -13,6 +13,7 @@
 #include <linux/moduleparam.h>
 #include <linux/page-flags.h>
 #include <linux/pagemap.h>
+#include <linux/page_idle.h>
 #include <linux/pfn_t.h>
 #include <linux/proc_fs.h>
 #include <linux/swap.h>
@@ -25,7 +26,7 @@
 
 
 MODULE_DESCRIPTION("Proc File Enabled Swap Hint Handler.");
-#define VERSION_NUMBER "0.62"
+#define VERSION_NUMBER "0.63"
 MODULE_VERSION(VERSION_NUMBER);
 
 #define BUFSIZE 1024
@@ -78,33 +79,43 @@ static ssize_t swaphints_read(struct file *file, char *buffer, size_t count,
  */
 static int swaphints_swap_a_page(unsigned long pagenumber)
 {
-	pfn_t pfnt;
-	struct page *p;
-	pg_data_t *pgdat;
-	u64 pfn_val = pagenumber;
+	struct page *page;
+	u64 pfn = pagenumber;
 
-	if (pfn_val == 0)
+	if (pfn == 0)
 		return 0;
-	pfnt = pfn_to_pfn_t(pfn_val);
-	p = pfn_t_to_page(pfnt);
+	page = pfn_to_page(pfn);
 
-	if (!trylock_page(p))
+	if (!PageLRU(page))
 		return 0;
 
-	if (PageLRU(p)) {
-		pgdat = page_pgdat(p);
-
-		unlock_page(p);
-		/*
-		 * Filtering on the zones here may be a future optimization.  Particularly
-		 * anything in Zone DMA. The shrink_page_list call have been tested this, and
-		 * must change together.
-		 */
-		return inject_reclaim_page(pgdat, 0, ZONE_NORMAL, p);
-	} else {
-		unlock_page(p);
+	if (PageTransCompound(page)) {
+		printk(KERN_INFO "pfn: %lu - page transparent\n", pfn);
+		return 0;
 	}
-	return 0;
+
+	mapcount = page_mapcount(page);
+	if (mapcount != 1) {
+		printk(KERN_INFO "pfn: %lu - page_mapcount() = %lu\n", pfn, mapcount);
+		return 0;
+	}
+
+
+	ClearPageReferenced(page);
+	test_and_clear_page_young(page);
+
+	if (isolate_lru_page(page)){
+		printk(KERN_INFO "pfn: %lu - failed isolate_lru_page\n", pfn);
+		return 0;
+	}
+
+	if (PageUnevictable(page)) {
+		printk(KERN_INFO "pfn: %lu - page unevictable\n", pfn);
+		putback_lru_page(page);
+		return 0;
+	}
+
+	return reclaim_page(page);
 }
 
 /**
@@ -119,6 +130,7 @@ static int swaphints_swap_the_pagelist(void)
 {
 	int pages_swapped = 0;
 	int i;
+	u64 pfn;
 
 	for (i = 0; i < *swaphints_page_offset; i++) {
 		pages_swapped += swaphints_swap_a_page(swaphints_page_list[i]);
