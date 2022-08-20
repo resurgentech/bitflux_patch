@@ -33,19 +33,23 @@ def print_line(a, tag, l):
 
 
 def print_ansible_output(out):
+    count = 0
+    # attempt find output from ansible to print nicely
     a = re.search(r'=> {', out)
     b = [ m.start() for m in re.finditer(r'}', out)]
     d = out[a.end():b[-1]]
     e = json.loads("{" + d + "}")
-    print_line('-','cmd:',80)
-    print(e['cmd'])
-    print_line('-','exitcode:',80)
-    print(e['rc'])
-    print_line('-','stdout:',80)
-    print(e['stdout'])
-    print_line('-','stderr:',80)
-    print(e['stderr'])
+    print(e.keys())
+    for key in ['cmd', 'exitcode', 'stdout', 'stderr']:
+        if e.get(key, None) is None:
+            print_line('-', '{}:MISSING'.format(key),80)
+            continue
+        print_line('-','{}:'.format(key),80)
+        print(e[key])
+        count += 1
     print('-'*80)
+    if count == 0:
+        raise
 
 
 def do_ansible(configs, script, args, extravars=None, interpreter=None):
@@ -70,7 +74,10 @@ def do_ansible(configs, script, args, extravars=None, interpreter=None):
         print("="*80)
         print("stderr: {}".format(err))
         print("="*80)
-        print_ansible_output(out)
+        try:
+            print_ansible_output(out)
+        except:
+            print("stdout: {}".format(out))
         print("="*80)
         raise
     return exitcode, out, err

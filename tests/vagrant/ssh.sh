@@ -6,4 +6,8 @@ TARGETIPS=($(cat inventory.yaml | grep ansible_ip | sed 's/\s*ansible_ip\:\s*//'
 TARGETIP="${TARGETIPS[$VAGRANT_HOST]}"
 echo $TARGETIP
 
-ssh vagrant@$TARGETIP $@
+TARGETKEYS=($(cat inventory.yaml | grep ansible_ssh_private_key_file | sed 's/\s*ansible_ssh_private_key_file\:\s*//' | sed 's/^.\/workdir//' | sed "s|^|${PWD}/machines/|"))
+TARGETKEY="${TARGETKEYS[$VAGRANT_HOST]}"
+echo $TARGETKEY
+
+ssh -i $TARGETKEY vagrant@$TARGETIP $@

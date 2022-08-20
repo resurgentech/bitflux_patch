@@ -13,7 +13,10 @@ def git_checkout_kernel(build_dir, kernel_branch, giturl, git_ref_urls_path):
     print("Checkout branch '{}' from '{}'".format(kernel_branch, git_ref_urls_path))
     run_cmd("git clone {} --reference-if-able {} {}".format(giturl, git_ref_urls_path, branch_filepath), verbose=False)
     run_cmd("git fetch --all", workingdir=filepath, verbose=False)
-    run_cmd("git checkout origin/{}".format(kernel_branch), workingdir=filepath, verbose=False)
+    if kernel_branch =='master' or re.match(r'y$', kernel_branch):
+        run_cmd("git checkout origin/{}".format(kernel_branch), workingdir=filepath, verbose=False)
+    else:
+        run_cmd("git checkout {}".format(kernel_branch), workingdir=filepath, verbose=False)
     if kernel_branch == "master":
         _, output, _ = run_cmd("cd {}; git tag -l | sort --version-sort".format(filepath), verbose=False)
         output = output.splitlines()
