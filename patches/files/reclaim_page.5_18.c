@@ -94,7 +94,7 @@ EXPORT_SYMBOL(request_reclaim_flusher_wakeup);
  * At the end we call the normal balance pgdat to give an opportunity to correct
  * impact to balance that this may have caused without delay.
  */
-extern int inject_reclaim_page(pg_data_t *pgdat, int order, int classzone_idx,
+extern int inject_reclaim_page_alt(pg_data_t *pgdat, int order, int classzone_idx,
 			       struct page *page)
 {
 	unsigned long nr_soft_scanned;
@@ -175,5 +175,52 @@ extern int inject_reclaim_page(pg_data_t *pgdat, int order, int classzone_idx,
 	set_task_reclaim_state(current, NULL);
 
 	return nr_reclaimed;
+}
+
+#include <linux/page_idle.h>
+
+extern int inject_reclaim_page(pg_data_t *pgdat, int order, int classzone_idx,
+			       struct page *page)
+{
+	int output;
+	unsigned long mapcount;
+	unsigned long pfn;
+	LIST_HEAD(page_list);
+
+	//INIT_LIST_HEAD(&page_list);
+
+	pfn  = (unsigned long) page_to_pfn(page);
+
+	if (PageTransCompound(page)) {
+		printk(KERN_INFO "pfn: %lu - page transparent\n", pfn);
+		return 0;
+	}
+
+	mapcount = page_mapcount(page);
+	if (mapcount != 1) {
+		printk(KERN_INFO "pfn: %lu - page_mapcount() = %lu\n", pfn, mapcount);
+		return 0;
+	}
+
+
+	ClearPageReferenced(page);
+	test_and_clear_page_young(page);
+
+	if (isolate_lru_page(page)){
+		printk(KERN_INFO "pfn: %lu - failed isolate_lru_page\n", pfn);
+		return 0;
+	}
+
+	if (PageUnevictable(page)) {
+		printk(KERN_INFO "pfn: %lu - page unevictable\n", pfn);
+		putback_lru_page(page);
+		return 0;
+	}
+
+	list_add(&page->lru, &page_list);
+
+	output = (int) reclaim_pages(&page_list);
+
+	return output;
 }
 EXPORT_SYMBOL(inject_reclaim_page);
