@@ -2,12 +2,18 @@
 - name: role to refresh package repos
   hosts: all
   tasks:
-  - name: dnf style
+  - name: yum/dnf style wipe
+    shell: rm -rf /etc/yum.repos.d/bitflux.repo
+    ignore_errors: true
+  - name: dnf style clean all
     shell: dnf clean all
     ignore_errors: true
-  - name: yum style
+  - name: yum style clean all
     shell: yum clean all
     ignore_errors: true
-  - name: apt style
+  - name: apt style wipe
+    shell: rm -rf /etc/apt/sources.list.d/bitflux.sources
+    ignore_errors: true
+  - name: apt style clean all
     shell: apt-get update
     ignore_errors: true

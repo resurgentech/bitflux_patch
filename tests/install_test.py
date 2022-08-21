@@ -444,6 +444,9 @@ if __name__ == '__main__':
     # Install the kernel packages
     install_kernel(args, configs, installer_options, installer_config)
 
+    # Update repos to get latest entries and wipe kernel settings
+    do_ansible(configs, "update_repos.yml", args)
+
     # Install bitflux packages
     install_bitflux(args, configs, installer_options, installer_config)
 
