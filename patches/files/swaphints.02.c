@@ -246,10 +246,10 @@ static int swaphints_swap_the_pagelist(void)
 		 */
 		swaphints_push_status(status, pfn);
 		/**
-		 * Status of 1 means we successfull swapped
+		 * Status of >0 means we successfull swapped
 		 */
-		if (status == 1)
-			pages_swapped++;
+		if (status > 0)
+			pages_swapped += status;
 		/**
 		 * Every few hundred pages we proactively wakeup the flusher.
 		 */
