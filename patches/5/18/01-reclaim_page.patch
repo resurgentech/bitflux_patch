@@ -1,25 +1,26 @@
 diff --git a/include/linux/swap.h b/include/linux/swap.h
-index 4cc6ec3..48d5a8e 100644
+index 27093b477c5f..4d219d826bf1 100644
 --- a/include/linux/swap.h
 +++ b/include/linux/swap.h
-@@ -357,6 +357,7 @@ extern unsigned long zone_reclaimable_pages(struct zone *zone);
- extern unsigned long try_to_free_pages(struct zonelist *zonelist, int order,
- 					gfp_t gfp_mask, nodemask_t *mask);
- extern bool __isolate_lru_page_prepare(struct page *page, isolate_mode_t mode);
+@@ -357,7 +357,8 @@ extern void folio_add_lru(struct folio *);
+ extern void lru_cache_add(struct page *);
+ void mark_page_accessed(struct page *);
+ void folio_mark_accessed(struct folio *);
+-
 +extern int request_reclaim_flusher_wakeup(void);
-+extern int reclaim_page(struct page *page);
- extern unsigned long try_to_free_mem_cgroup_pages(struct mem_cgroup *memcg,
- 						  unsigned long nr_pages,
- 						  gfp_t gfp_mask,
++extern unsigned long reclaim_page(struct page *page);
+ extern atomic_t lru_disable_count;
+ 
+ static inline bool lru_cache_disabled(void)
 diff --git a/mm/vmscan.c b/mm/vmscan.c
-index 562e87c..04674e9 100644
+index 1678802e03e7..c89121e36bda 100644
 --- a/mm/vmscan.c
 +++ b/mm/vmscan.c
-@@ -3746,6 +3746,7 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int highest_zoneidx)
- 	return sc.order;
+@@ -2517,6 +2517,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
+            nr_deactivate, nr_rotated, sc->priority, file);
  }
  
 +//__reclaim_page.merge//
- /*
-  * The pgdat->kswapd_highest_zoneidx is used to pass the highest zone index to
-  * be reclaimed by kswapd from the waker. If the value is MAX_NR_ZONES which is
+ unsigned long reclaim_pages(struct list_head *page_list)
+ {
+    int nid = NUMA_NO_NODE;
