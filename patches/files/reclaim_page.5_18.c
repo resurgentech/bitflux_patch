@@ -6,18 +6,20 @@ extern int request_reclaim_flusher_wakeup(void)
 }
 EXPORT_SYMBOL(request_reclaim_flusher_wakeup);
 
-extern int reclaim_page(struct page *page)
+extern unsigned long reclaim_page(struct page *page)
 {
-	int output;
-	unsigned long mapcount;
-	u64 pfn;
+	if (isolate_lru_page(page))
+		return -EINVAL;
+
+	if (PageUnevictable(page)) {
+		putback_lru_page(page);
+		return -EPERM;
+	}
 
 	LIST_HEAD(page_list);
 
 	list_add(&page->lru, &page_list);
 
-	output = (int) reclaim_pages(&page_list);
-
-	return output;
+	return reclaim_pages(&page_list);
 }
 EXPORT_SYMBOL(reclaim_page);

@@ -26,119 +26,253 @@
 
 
 MODULE_DESCRIPTION("Proc File Enabled Swap Hint Handler.");
-#define VERSION_NUMBER "0.63"
+#define VERSION_NUMBER "0.64"
 MODULE_VERSION(VERSION_NUMBER);
-
-#define BUFSIZE 1024
-#define PROCFS_MAX_SIZE 1024
-#define PGLIST_MAX_SIZE 1048576 //up to 4GB swapout
 #define PROCFS_NAME "swaphints"
+
+
+/**
+ * Internal error codes for debug and feedback
+ */
+#define ERR_SWAPHINTS_ISOLATE_LRU EINVAL
+#define ERR_SWAPHINTS_UNEVICTABLE EPERM
+#define ERR_SWAPHINTS_NOT_PAGELRU 101
+#define ERR_SWAPHINTS_PAGETRANSCOMPOUND 102
+#define ERR_SWAPHINTS_MAPCOUNT 103
+
+/**
+ * Structure to hold return values from reclaim_page()
+ */
+struct swaphints_status_struct {
+	u64 *pfns;
+	u64 *status;
+	int head;
+	int tail;
+	int max;
+};
+
+/**
+ * Structure used with proc iterators
+ */
+struct swaphints_status_entry {
+	u64 pfn;
+	u64 status;
+};
+
+static DEFINE_MUTEX(swaphints_lock);
+
+/**
+ * Structure holds list of pfns to swap and a buffer for write
+ */
+struct swaphints_pfn_list_struct {
+	u64 *pfns;
+	char *buffer;
+	int index;
+	int max;
+	int wake_limit;
+};
+
+/**
+ * Returns the number of empty entries in the ring buffer
+ */
+#define swaphints_status_buffer_space(b) \
+	(((b).tail == (b).head) ? \
+		((b).max) : \
+		(((b).tail > (b).head) ? \
+			(((b).tail - (b).head - 1) & ((b).max)) : \
+			((b).max + (b).tail - (b).head) \
+		) \
+	)
+/**
+ * Returns true if buffer is empty
+ */
+#define swaphints_status_buffer_empty(b)    ((b).head == (b).tail)
 
 /**
  * This structure hold information about the /proc file
- *
  */
 static struct proc_dir_entry *swaphints_proc_file;
 
 /**
- * The buffer used to store character for this module
- *
+ * ring buffer for return valus from swaphints_swap_a_page
+ * data is fed back to userspace to improve accuracy
  */
-static unsigned long *swaphints_page_list;
-static unsigned long *swaphints_page_offset;
+struct swaphints_status_struct status_buffer;
 
 /**
- * Debug switch
- *
+ * list of pfns userspace requesting to be reclaimed
  */
-static int debug = 0;
+struct swaphints_pfn_list_struct swaphints_pfn_list;
+
+
+/* Module Parameters */
+
+/**
+ * Flags debug printf's when set to 1
+ */
+int debug = 0;
 module_param(debug, int, 0660);
 
 /**
- * This function is called then the /proc file is read
- * We don't currently provide any real info, so we just return 0.
+ * write buffer for user space to send via /proc/swaphints
  */
-static ssize_t swaphints_read(struct file *file, char *buffer, size_t count,
-			      loff_t *data)
-{
-	int ret = 0;
-	if (debug)
-		printk(KERN_INFO "swaphints_read (/proc/%s) called\n",
-		       PROCFS_NAME);
+int write_buffer_size = 1024;
+module_param(write_buffer_size, int, 0660);
 
-	if (count > 0) {
-		ret = 0;
-	}
+/**
+ * Length of pfn list buffer to stash user input into
+ */
+int pfn_list_length = 1<<20;
+module_param(pfn_list_length, int, 0660);
 
-	return ret;
-}
+/**
+ * How many pfns to swap out before waking reclaim walk up
+ */
+int pfn_list_wake_limit = 512;
+module_param(pfn_list_wake_limit, int, 0660);
 
-/*
+/**
+ * Length of ring buffer for stashing status of pfn
+ * MUST BE power of 2 or the math doesn't work in our buffer logic.
+ */
+int status_max_len = 1<<21;
+module_param(status_max_len, int, 0660);
+
+/**
  * Internal Function to request the reclamation of a single specific page.
- *
  */
-static int swaphints_swap_a_page(unsigned long pagenumber)
+static unsigned long swaphints_swap_a_page(unsigned long pagenumber)
 {
 	struct page *page;
 	u64 pfn = pagenumber;
+	int mapcount;
 
-	if (pfn == 0)
-		return 0;
 	page = pfn_to_page(pfn);
 
 	if (!PageLRU(page))
-		return 0;
+		return -ERR_SWAPHINTS_NOT_PAGELRU;
 
-	if (PageTransCompound(page)) {
-		printk(KERN_INFO "pfn: %lu - page transparent\n", pfn);
-		return 0;
-	}
+	if (PageTransCompound(page))
+		return -ERR_SWAPHINTS_PAGETRANSCOMPOUND;
 
 	mapcount = page_mapcount(page);
-	if (mapcount != 1) {
-		printk(KERN_INFO "pfn: %lu - page_mapcount() = %lu\n", pfn, mapcount);
-		return 0;
-	}
-
+	if (mapcount != 1)
+		return -ERR_SWAPHINTS_MAPCOUNT;
 
 	ClearPageReferenced(page);
 	test_and_clear_page_young(page);
-
-	if (isolate_lru_page(page)){
-		printk(KERN_INFO "pfn: %lu - failed isolate_lru_page\n", pfn);
-		return 0;
-	}
-
-	if (PageUnevictable(page)) {
-		printk(KERN_INFO "pfn: %lu - page unevictable\n", pfn);
-		putback_lru_page(page);
-		return 0;
-	}
 
 	return reclaim_page(page);
 }
 
 /**
+ * Add status of pfn reclaim to ring buffer
+ */
+static void swaphints_push_status(u64 status, u64 pfn)
+{
+	int next_head;
+	status_buffer.pfns[status_buffer.head] = pfn;
+	status_buffer.status[status_buffer.head] = status;
+	/**
+	 *  If head is already at end of buffer
+	 *  Then we are going to wrap back to zero otherwise increment
+	 */
+	if (status_buffer.head == status_buffer.max)
+		next_head = 0;
+	else
+		next_head = status_buffer.head + 1;
+
+	/**
+	 * If buffer is full we need to advance the tail.
+	 * If the tail is at the end of the buffer we wrap it.
+	 */
+	if (swaphints_status_buffer_space(status_buffer) == 0) {
+		if (status_buffer.tail == status_buffer.max)
+			status_buffer.tail = 0;
+		else
+			status_buffer.tail++;
+	}
+	status_buffer.head = next_head;
+}
+
+/**
+ * Remove status from ring buffer
+ */
+static int swaphints_pop_status(u64 *status, u64 *pfn)
+{
+	/**
+	 * Nothing if return if we're empty
+	 */
+	if (swaphints_status_buffer_empty(status_buffer))
+		return 1;
+	*pfn = status_buffer.pfns[status_buffer.tail];
+	*status = status_buffer.status[status_buffer.tail];
+
+	/**
+	 * If the tail is at the end of the buffer we wrap it.
+	 */
+	if (status_buffer.tail == status_buffer.max)
+		status_buffer.tail = 0;
+	else
+		status_buffer.tail++;
+
+	return 0;
+}
+
+/**
  * Internal function to process a list of specific pages through individual
- * reclamation. After the list, and every few hundred pages we proactively
- * wakeup the flusher thread. This improves long term performance, and keeps
- * memory from being filled with reclaim pages and prevents the flusher from
- * hitting a state where it will have to stop and reclaim in a more aggressive
- * manner.
+ * reclamation.
+ *
+ * We also proactively wakeup the flusher thread.  We believe this improves
+ * long term performance, keeps memory from being filled with reclaim pages,
+ * and prevents the flusher from hitting a state where it will have to stop 
+ * to reclaim in a more aggressive manner.
  */
 static int swaphints_swap_the_pagelist(void)
 {
 	int pages_swapped = 0;
 	int i;
+	u64 status;
 	u64 pfn;
 
-	for (i = 0; i < *swaphints_page_offset; i++) {
-		pages_swapped += swaphints_swap_a_page(swaphints_page_list[i]);
-		if ((i % 512) == 0)
+	/**
+	 * Loop through pfn list to target each pfn
+	 */
+	for (i = 0; i < swaphints_pfn_list.index; i++) {
+		pfn = swaphints_pfn_list.pfns[i];
+		status = swaphints_swap_a_page(pfn);
+		/**
+		 * Log status of each swap
+		 */
+		swaphints_push_status(status, pfn);
+		/**
+		 * Status of 1 means we successfull swapped
+		 */
+		if (status == 1)
+			pages_swapped++;
+		/**
+		 * Every few hundred pages we proactively wakeup the flusher.
+		 */
+		if ((i % swaphints_pfn_list.wake_limit) == 0)
 			request_reclaim_flusher_wakeup();
 	}
+	/**
+	 * Wakeup flusher thread
+	 */
 	request_reclaim_flusher_wakeup();
+	swaphints_pfn_list.index = 0;
 	return pages_swapped;
+}
+
+static void swaphints_swapnow(void)
+{
+	int swapped;
+	if (debug)
+		printk(KERN_INFO "Beginning swap attempt of %d pages\n", swaphints_pfn_list.index);
+	if (swaphints_pfn_list.index > 0)
+		swapped = swaphints_swap_the_pagelist();
+	if (debug)
+		printk(KERN_INFO "Swaphints reclaimed %d pages\n", swapped);
 }
 
 /**
@@ -146,135 +280,235 @@ static int swaphints_swap_the_pagelist(void)
  * It accepts either a pfn in the form of a numeric decimal string (e.g.
  * "437895468") or the key word "swapnow" all other inputs are ignored.
  * subsequent numbers submitted are added to a list, and
- * swapnow will begin processing the list.
- * fs locking may be insufficient, and we may need to claim a lock on this
- * function to avoid altering the list of pages while being reclaimed.
+ * "swapnow" will begin processing the list.
  */
 static ssize_t swaphints_write(struct file *file, const char __user *ubuf,
 			       size_t count, loff_t *ppos)
 {
-	int num, c = 0;
-	int swapped = 0;
-	unsigned long bignumber;
-	char *buf;
-	if ((buf = kvzalloc(BUFSIZE, GFP_KERNEL)) == NULL)
-		return -ENOMEM;
-	if (*ppos > 0 || count > BUFSIZE) {
-		kvfree(buf);
-		return -EFAULT;
-	}
-	if (copy_from_user(buf, ubuf, count)) {
-		kvfree(buf);
-		return -EFAULT;
-	}
-	if (strstr(buf, "swapnow") != NULL) {
-		swapped = 0;
-		if (debug)
-			printk(KERN_INFO
-			       "Beginning swap attempt of %ld pages\n",
-			       *swaphints_page_offset);
-		if (*swaphints_page_offset > 0) {
-			swapped = swaphints_swap_the_pagelist();
-			*swaphints_page_offset = 0;
-			if (debug)
-				printk(KERN_INFO
-				       "Swaphints reclaimed %d pages\n",
-				       swapped);
-		}
-		c = strlen(buf);
-		*ppos = c;
-		kvfree(buf);
-		return c;
-	} else {
-		num = sscanf(buf, "%ld", &bignumber);
-		if (num != 1) {
-			kvfree(buf);
-			return -EFAULT;
-		}
-		c = strlen(buf);
-		*ppos = c;
-		swaphints_page_list[*swaphints_page_offset] = bignumber;
-		(*swaphints_page_offset)++;
+	unsigned long pfn;
+	int ret = 0;
 
-		if (*swaphints_page_offset >= PGLIST_MAX_SIZE) {
-			swapped = 0;
-			swapped = swaphints_swap_the_pagelist();
-			*swaphints_page_offset = 0;
-			if (debug)
-				printk(KERN_INFO "Swaphints reclaimed %d pages",
-				       swapped);
-		}
-		kvfree(buf);
-		return c;
+	printk(KERN_INFO "swaphints_write ppos=%ld count=%ld max=%d\n", *ppos, count, swaphints_pfn_list.max);
+	/**
+	 * We're going to ignore write that too long or continued.
+	 */
+	if (*ppos > 0 || count > swaphints_pfn_list.max) {
+		printk(KERN_INFO "swaphints_write A");
+		printk(KERN_INFO "");
+		return -EFAULT;
 	}
+
+	mutex_lock(&swaphints_lock);
+
+	/**
+	 * Copy data from userspace to a buffer we can use here.
+	 */
+	if (copy_from_user(swaphints_pfn_list.buffer, ubuf, count)) {
+		printk(KERN_INFO "Swaphints copy_from_user failed\n");
+		ret = -EFAULT;
+		goto write_exit;
+	}
+
+	/**
+	 * If we recieve swapnow we're just going to swap whats in the list
+	 */
+	if (strstr(swaphints_pfn_list.buffer, "swapnow")) {
+		swaphints_swapnow();
+	} else {
+		/**
+		 * Find the pfn from userspace and record if valid
+		 */
+		if (sscanf(swaphints_pfn_list.buffer, "%ld", &pfn) != 1) {
+			printk(KERN_INFO "Swaphints can't read number '%s'\n", swaphints_pfn_list.buffer);
+			ret = -EFAULT;
+			goto write_exit;
+		}
+		if (pfn == 0) {
+			printk(KERN_INFO "Swaphints recieved pfn 0\n");
+			ret = -EFAULT;
+			goto write_exit;
+		}
+		swaphints_pfn_list.pfns[swaphints_pfn_list.index] = (u64) pfn;
+		swaphints_pfn_list.index++;
+
+		/**
+		 * If our list is full, we swap now.
+		 */
+		if (swaphints_pfn_list.index == (swaphints_pfn_list.max - 1))
+			swaphints_swapnow();
+	}
+	ret = strnlen(swaphints_pfn_list.buffer, swaphints_pfn_list.max);
+	*ppos = ret;
+	memset((void *)swaphints_pfn_list.buffer, 0, write_buffer_size);
+write_exit:
+	mutex_unlock(&swaphints_lock);
+	printk(KERN_INFO "Swaphints_write out '%d' '%s'\n", ret, swaphints_pfn_list.buffer);
+	return ret;
 }
 
-static int show_swaphints(struct seq_file *s, void *p)
+/* Iterators for procfile reads */
+
+/**
+ * Start of iteration.  Returns NULL if there is nothing to do.
+ * Or passes the first object to the _show() function.
+ */
+static void *swaphints_start(struct seq_file *swaphint, loff_t *pos)
 {
-	seq_printf(s, "swaphints lives here");
+	struct swaphints_status_entry *s;
+
+	s = kvzalloc(sizeof(*s), GFP_KERNEL);
+
+	mutex_lock(&swaphints_lock);
+
+	if (swaphints_pop_status(&(s->status), &(s->pfn))) {
+		kvfree(s);
+		return NULL;
+	}
+
+	return s;
+}
+
+/**
+ * Next iter.  Also returns NULL if there is nothing to do.
+ * Or passes the first object to the _show() function.
+ */
+static void *swaphints_next(struct seq_file *swaphint, void *v, loff_t *pos)
+{
+	struct swaphints_status_entry *s = v;
+
+	++(*pos);
+
+	if (swaphints_pop_status(&(s->status), &(s->pfn))) {
+		kvfree(s);
+		return NULL;
+	}
+
+	return s;
+}
+
+/**
+ * End of iteration.  Called if _start() or _next() returns NULL.
+ */
+static void swaphints_stop(struct seq_file *swaphint, void *v)
+{
+	mutex_unlock(&swaphints_lock);
+}
+
+/**
+ * 'print' data to userspace.  Passes data upstream for sending back to user.
+ */
+static int swaphints_show(struct seq_file *swaphint, void *v)
+{
+	struct swaphints_status_entry *s = v;
+
+	if (seq_write(swaphint, &(s->status), sizeof(s->status)))
+		return -1;
+	if (seq_write(swaphint, &(s->pfn), sizeof(s->pfn)))
+		return -1;
+
 	return 0;
 }
 
+static const struct seq_operations swaphelper_op = {
+	.start =	swaphints_start,
+	.next =		swaphints_next,
+	.stop =		swaphints_stop,
+	.show =		swaphints_show
+};
+
+/**
+ * Called when user does open() to file, for read or write.
+ * Note it sets us up to use the seq_ iterators.
+ */
 static int swaphints_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, show_swaphints, NULL);
+	int ret;
+
+	ret = seq_open(file, &swaphelper_op);
+	if (ret)
+		return ret;
+
+	return 0;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
-static struct proc_ops swaphelper_proc_ops = {
-	.proc_read = swaphints_read,
-	.proc_write = swaphints_write,
-	.proc_lseek = seq_lseek,
-	.proc_release = single_release,
-	.proc_open = swaphints_open,
+static const struct proc_ops swaphints_proc_ops = {
+	.proc_open	= swaphints_open,
+	.proc_read	= seq_read,
+	.proc_write	= swaphints_write,
+	.proc_lseek	= seq_lseek,
+	.proc_release	= seq_release,
 };
-#else
-static const struct file_operations swaphelper_proc_ops = {
-	.open = swaphints_open,
-	.read = swaphints_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-	.write = swaphints_write,
-};
-#endif
 
-static int __init swaphints_example_init(void)
+/**
+ * Clean up module buffers
+ */
+static void swaphints_cleanup(void)
+{
+	kvfree(swaphints_pfn_list.pfns);
+	kvfree(swaphints_pfn_list.buffer);
+	kvfree(status_buffer.pfns);
+	kvfree(status_buffer.status);
+}
+
+static int __init swaphints_init(void)
 {
 	/* create the /proc file */
 	swaphints_proc_file =
-		proc_create(PROCFS_NAME, 0666, NULL, &swaphelper_proc_ops);
-
-	if (swaphints_proc_file == NULL) {
+		proc_create(PROCFS_NAME, 0666, NULL, &swaphints_proc_ops);
+	if (!swaphints_proc_file) {
 		remove_proc_entry(PROCFS_NAME, NULL);
 		printk(KERN_ALERT "Error: Could not initialize /proc/%s\n",
 		       PROCFS_NAME);
 		return -ENOMEM;
 	}
 
-	if ((swaphints_page_list =
-		     kvcalloc(PGLIST_MAX_SIZE, sizeof(unsigned long),
-			      GFP_KERNEL)) == NULL)
-		return -ENOMEM;
+	/**
+	 * Need to check the status_max_len to valid it's a power of two.
+	 */
+	if ((status_max_len < 4) || \
+	    (status_max_len & (status_max_len - 1))) {
+		printk(KERN_INFO "/proc/%s failed, status_max_len=%d should be power of two\n",PROCFS_NAME,status_max_len);
+		return -EINVAL;
+	}
 
-	if ((swaphints_page_offset =
-		     kvzalloc(sizeof(unsigned long), GFP_KERNEL)) == NULL)
+	/**
+	 * Tedious initialization of module scope structures
+	 */
+	swaphints_pfn_list.index = 0;
+	swaphints_pfn_list.max = pfn_list_length;
+	swaphints_pfn_list.wake_limit = pfn_list_wake_limit;
+	if (!(swaphints_pfn_list.pfns = kvcalloc(swaphints_pfn_list.max, sizeof(*swaphints_pfn_list.pfns), GFP_KERNEL))) {
+		swaphints_cleanup();
 		return -ENOMEM;
-
-	(*swaphints_page_offset) = 0;
+	}
+	if (!(swaphints_pfn_list.buffer = kvzalloc(write_buffer_size, GFP_KERNEL))) {
+		swaphints_cleanup();
+		return -ENOMEM;
+	}
+	status_buffer.head = 0;
+	status_buffer.tail = 0;
+	status_buffer.max = status_max_len - 1;
+	if (!(status_buffer.pfns = kvcalloc(status_buffer.max + 1, sizeof(*status_buffer.pfns), GFP_KERNEL))) {
+		swaphints_cleanup();
+		return -ENOMEM;
+	}
+	if (!(status_buffer.status = kvcalloc(status_buffer.max + 1, sizeof(*status_buffer.status), GFP_KERNEL))) {
+		swaphints_cleanup();
+		return -ENOMEM;
+	}
 
 	printk(KERN_INFO "/proc/%s created, v%s\n", PROCFS_NAME,
 	       VERSION_NUMBER);
-	return 0; /* everything is ok */
+	return 0;
 }
 
-static void __exit swaphints_example_exit(void)
+static void __exit swaphints_exit(void)
 {
 	remove_proc_entry(PROCFS_NAME, NULL);
-	kvfree(swaphints_page_list);
-	kvfree(swaphints_page_offset);
+	swaphints_cleanup();
 	printk(KERN_INFO "Cleaning Up swaphints!\n");
 }
 
-module_init(swaphints_example_init);
-module_exit(swaphints_example_exit);
+module_init(swaphints_init);
+module_exit(swaphints_exit);
 MODULE_LICENSE("GPL");
