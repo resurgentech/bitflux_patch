@@ -54,6 +54,8 @@ def test_git_build(args):
 
     # Run kernel build
     if args.nobuild:
+        run_cmd("rm -rf ./output;", allow_errors=True)
+        copy_outputs("{}/*.new".format(patches_dir), outputdir='./output/patches/')
         return
 
     # We're going to build ubuntu debs
