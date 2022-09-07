@@ -46,7 +46,7 @@ def test_git_build(args):
 
     if init_commit is not None:
         filepath = os.path.join(patches_dir, "complete.patch")
-        commit_and_create_patch(kernel_version, src_dir, commit_hash=init_commit, verbose=args.verbose)
+        commit_and_create_patch(filepath, src_dir, commit_hash=init_commit, verbose=args.verbose)
     print("Patching Complete")
     sys.stdout.flush()
     sleep(3)
