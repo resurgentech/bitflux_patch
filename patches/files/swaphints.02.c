@@ -232,7 +232,7 @@ static int swaphints_swap_the_pagelist(void)
 {
 	int pages_swapped = 0;
 	int i;
-	u64 status;
+	unsigned long status;
 	u64 pfn;
 
 	/**
@@ -337,7 +337,7 @@ static ssize_t swaphints_write(struct file *file, const char __user *ubuf,
 		if (swaphints_pfn_list.index == (swaphints_pfn_list.max - 1))
 			swaphints_swapnow();
 	}
-	ret = strnlen(swaphints_pfn_list.buffer, swaphints_pfn_list.max);
+	ret = strnlen(swaphints_pfn_list.buffer, write_buffer_size);
 	*ppos = ret;
 	memset((void *)swaphints_pfn_list.buffer, 0, write_buffer_size);
 write_exit:
