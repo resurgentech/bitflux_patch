@@ -7,6 +7,7 @@ EXPORT_SYMBOL(request_reclaim_flusher_wakeup);
 
 extern unsigned long reclaim_page(struct page *page)
 {
+	int retval;
 	LIST_HEAD(page_list);
 
 	if (isolate_lru_page(page))
@@ -19,7 +20,8 @@ extern unsigned long reclaim_page(struct page *page)
 
 	list_add(&page->lru, &page_list);
 
-	return reclaim_pages(&page_list);
+	retval = reclaim_pages(&page_list);
+	return retval;
 }
 EXPORT_SYMBOL(reclaim_page);
 

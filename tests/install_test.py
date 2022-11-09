@@ -369,21 +369,24 @@ def swapping(configs, args):
         return 0
     swaptotal = 0
     swapfree = 0
+    swapcached = 0
     for l in out.splitlines():
         b = l.split()
         if b[0].find('SwapTotal:') != -1:
             swaptotal = int(b[1])
         elif b[0].find('SwapFree:') != -1:
             swapfree = int(b[1])
-    swapped = swaptotal - swapfree
+        elif b[0].find('SwapCached:') != -1:
+            swapcached = int(b[1])
+    swapped = swaptotal - swapfree - swapcached
     # Do we see any pages swapped we'll settle for 10M
-    if swapped < 10000:
-        print("swapped: {} swaptotal: {} swapfree: {}".format(swapped, swaptotal, swapfree))
+    if (swapped < 10000) or (swapcached > swapped/10):
+        print("swapped: {} swaptotal: {} swapfree: {} swapcached: {}".format(swapped, swaptotal, swapfree, swapcached))
         #print("stdout: '{}'".format(out))
         #print("stderr: '{}'".format(err))
         sys.stdout.flush()
         return 0
-    print("swapped: {} swaptotal: {} swapfree: {}".format(swapped, swaptotal, swapfree))
+    print("swapped: {} swaptotal: {} swapfree: {} swapcached: {}".format(swapped, swaptotal, swapfree, swapcached))
     return 1
 
 
@@ -517,6 +520,9 @@ if __name__ == '__main__':
 
     # No do the actual testing
     retval = run_tests(configs, args, 10)
+
+    # Look at swaphints
+    do_ansible(configs, "extract_swaphints.yml", args)
 
     # create and start vm
     if not args.noteardown:

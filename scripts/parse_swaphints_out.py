@@ -28,15 +28,20 @@ with open(sys.argv[1], 'rb') as f:
 print("pfn, status")
 
 out = {}
+outr = {}
 
 i = 0
-for statusi, pfn in struct.iter_unpack('qQ',data):
+for statusi, retries, pfn in struct.iter_unpack('iiQ',data):
+  #print("statusi {}  retries {}  pfn {}".format(statusi, retries, pfn))
   s = status(statusi)
   if out.get(s, None) is None:
     out[s] = {}
   if out[s].get(pfn, None) is None:
     out[s][pfn] = 0
   out[s][pfn] += 1
+  if outr.get(retries, None) is None:
+    outr[retries] = 0
+  outr[retries] += 1
   i += 1
 
 pfns = {}
@@ -49,3 +54,7 @@ for s in out:
     pfns[pfn] += 1
 
 print('{}:\tentry count'.format(i))
+
+print('retries, count')
+for r in sorted(outr.keys()):
+  print("{},{}\n".format(r,outr[r]))

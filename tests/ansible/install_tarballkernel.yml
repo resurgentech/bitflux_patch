@@ -12,7 +12,7 @@
     args:
       warn: false
   - name: Install kernel
-    shell: cd /tmp/latest/; apt install $(ls *.deb | sed 's/^/.\//')
+    shell: cd /tmp/latest/; apt install -y $(ls *.deb | sed 's/^/.\//')
   - name: Autoload Kernel
     shell: echo \"swaphints\" >> /etc/modules-load.d/swaphints.conf
   - name: Download installer

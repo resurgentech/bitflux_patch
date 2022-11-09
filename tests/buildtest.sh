@@ -8,9 +8,12 @@ then
   echo "${BASH_SOURCE[0]} KERNEL_VERSION";
 fi
 
-if [ ! -z $2 ]
+if [ "$2" == "EXIT_AFTER_BUILD" ]
 then
   EXIT_AFTER_BUILD="EXIT_AFTER_BUILD";
+elif [ "$2" == "SKIPBUILD" ]
+then
+  SKIPBUILD="SKIPBUILD"
 fi
 
 if [ ! -z $3 ]
@@ -18,17 +21,19 @@ then
   NOBUILD="--nobuild";
 fi
 
-echo "${KERNEL_VERSION} EXIT_AFTER_BUILD=${EXIT_AFTER_BUILD} NOBUILD=${NOBUILD}";
+echo "${KERNEL_VERSION} EXIT_AFTER_BUILD=${EXIT_AFTER_BUILD} NOBUILD=${NOBUILD} SKIPBUILD=${SKIPBUILD}";
 
 
 DIR="$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd ${DIR}/..
 WORKING_DIR=`pwd`
 
-
-./build.py --buildnumber 0 --kernel_version v${KERNEL_VERSION} \
-           --docker_image resurgentech/kernel_build-ubuntu2204:latest \
-           --build_type git ${NOBUILD};
+if [ -z ${SKIPBUILD} ]
+then
+  ./build.py --buildnumber 0 --kernel_version v${KERNEL_VERSION} \
+             --docker_image resurgentech/kernel_build-ubuntu2204:latest \
+             --build_type git ${NOBUILD};
+fi
 
 if [ ! -z ${EXIT_AFTER_BUILD} ]
 then

@@ -17,3 +17,10 @@
   - name: apt style clean all
     shell: apt-get update
     ignore_errors: true
+  - name: apt stop unattended upgrades
+    systemd:
+      name: unattended-upgrades
+      enabled: false
+    ignore_errors: true
+  - name: reboot
+    reboot:
