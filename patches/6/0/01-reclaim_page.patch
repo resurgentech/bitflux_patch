@@ -1,0 +1,26 @@
+diff --git a/include/linux/swap.h b/include/linux/swap.h
+index 27093b477c5f..4d219d826bf1 100644
+--- a/include/linux/swap.h
++++ b/include/linux/swap.h
+@@ -357,7 +357,8 @@ extern void folio_add_lru(struct folio *);
+ extern void lru_cache_add(struct page *);
+ void mark_page_accessed(struct page *);
+ void folio_mark_accessed(struct folio *);
+-
++extern int request_reclaim_flusher_wakeup(void);
++extern unsigned long reclaim_page(struct page *page);
+ extern atomic_t lru_disable_count;
+ 
+ static inline bool lru_cache_disabled(void)
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 1678802e03e7..c89121e36bda 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -2517,6 +2517,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
+            nr_deactivate, nr_rotated, sc->priority, file);
+ }
+ 
++//__reclaim_page.merge//
+ unsigned long reclaim_pages(struct list_head *page_list)
+ {
+    int nid = NUMA_NO_NODE;

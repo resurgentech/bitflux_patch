@@ -158,23 +158,8 @@ static unsigned long swaphints_swap_a_page(unsigned long pagenumber)
 
 	page = pfn_to_page(pfn);
 
-	/*
-	if (!PageLRU(page))
-		return -ERR_SWAPHINTS_NOT_PAGELRU;
-
-	if (PageTransCompound(page))
-		return -ERR_SWAPHINTS_PAGETRANSCOMPOUND;
-
-	mapcount = page_mapcount(page);
-	if (mapcount != 1)
-		return -ERR_SWAPHINTS_MAPCOUNT;
-	*/
-
 	ClearPageReferenced(page);
 	test_and_clear_page_young(page);
-	reclaim_page(page);
-	reclaim_page(page);
-	reclaim_page(page);
 	return reclaim_page(page);
 }
 
