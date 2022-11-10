@@ -24,16 +24,20 @@ for i in "$@"; do
       SMALLBUILD="SMALLBUILD"
       shift
       ;;
-   --distro=*)
+    --distro=*)
       DISTRO="${i#*=}"
       shift
       ;;
-   --docker_image=*)
+    --docker_image=*)
       DOCKER_IMAGE="${i#*=}"
       shift
       ;;
-   --vagrantbox=*)
+    --vagrantbox=*)
       VAGRANTBOX="${i#*=}"
+      shift
+      ;;
+    --noteardown)
+      NOTEARDOWN="--noteardown"
       shift
       ;;
     *)
@@ -56,11 +60,11 @@ if [ -z ${DISTRO} ]; then
     if [ "$KVTWO" == "14" ]; then # =v4.14
       DISTRO=amazonlinux2
       DOCKER_IMAGE="resurgentech/kernel_build-amazonlinux2:latest"
-      VAGRANTBOX="jaredeh/amazonlinux2"
+      VAGRANTBOX="jaredeh/ubuntu2004-server"
     else # >v4.14 <v5.0
       DISTRO=rockylinux8
       DOCKER_IMAGE="resurgentech/kernel_build-rockylinux8:latest"
-      VAGRANTBOX="jaredeh/rockylinux8-minimal"
+      VAGRANTBOX="jaredeh/ubuntu2004-server"
     fi
   elif [ "$KVONE" -lt "6" ]; then
     if [ "$KVTWO" -lt "12" ]; then # <v5.12
@@ -97,6 +101,7 @@ echo "  NO_TEST=${NO_TEST}"
 echo "  PATCHONLY=${PATCHONLY}"
 echo "  SKIPBUILD=${SKIPBUILD}"
 echo "  SMALLBUILD=${SMALLBUILD}"
+echo "  NOTEARDOWN=${NOTEARDOWN}"
 echo ""
 echo " Using:"
 echo "  KERNEL_VERSION=${ACTUAL_KERNEL_VERSION}"
@@ -139,4 +144,5 @@ popd;
                         --manual_modprobe \
                         --kernel_revision ${KERNEL_VERSION}-custom-1 \
                         --kernel_version ${KERNEL_VERSION}-custom \
-                        --tarballkernel output/a.tar.gz;
+                        --tarballkernel output/a.tar.gz \
+                        ${NOTEARDOWN};

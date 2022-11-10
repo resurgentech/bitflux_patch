@@ -106,6 +106,7 @@ def test_git_build(args):
         run_cmd("make tinyconfig", workingdir=src_dir, allow_errors=False, verbose=args.verbose)
         run_cmd("./scripts/config --enable PROC_FS", workingdir=src_dir, allow_errors=False, verbose=True)
         run_cmd("./scripts/config --enable MODULES", workingdir=src_dir, allow_errors=False, verbose=True)
+        run_cmd("./scripts/config --enable NUMA", workingdir=src_dir, allow_errors=False, verbose=True)
     else:
         # We're going to build ubuntu debs
         run_cmd("cp /boot/config-$(uname -r) .config", workingdir=src_dir, allow_errors=False, verbose=args.verbose)
@@ -132,9 +133,16 @@ def test_git_build(args):
     print("")
     print("Build exitcode={}".format(exitcode))
     print("")
+    if exitcode != 0:
+        print("===============================")
+        print("=========Build STDERR==========")
+        print(err)
+        print("===============================")
 
     # Copy outputs
     run_cmd("rm -rf ./output;", allow_errors=True)
     copy_outputs("./build/*.deb")
     copy_outputs("{}/.config".format(src_dir))
+    copy_outputs("{}/mm/vmscan.c".format(src_dir))
+    copy_outputs("{}/include/linux/swap.h".format(src_dir))
     copy_outputs("{}/*.new".format(patches_dir), outputdir='./output/patches/')

@@ -1,0 +1,15 @@
+# WIP, not currently used
+---
+- name: configure bitflux
+  hosts: all
+  tasks:
+  - name: Check for threshold
+    ini_file:
+      dest: /etc/bitflux/config/bitflux.conf
+      section: Model
+      option: threshold
+      value: 0.06
+  - name: Restart bitflux
+    systemd:
+      name: bitflux
+      state: reloaded
