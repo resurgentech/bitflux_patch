@@ -20,9 +20,6 @@
 #include <linux/uaccess.h>
 #include <linux/version.h>
 #include <linux/writeback.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
-#include <linux/slab.h>
-#endif
 
 
 MODULE_DESCRIPTION("Proc File Enabled Swap Hint Handler.");
@@ -36,9 +33,6 @@ MODULE_VERSION(VERSION_NUMBER);
  */
 #define ERR_SWAPHINTS_ISOLATE_LRU EINVAL
 #define ERR_SWAPHINTS_UNEVICTABLE EPERM
-#define ERR_SWAPHINTS_NOT_PAGELRU 101
-#define ERR_SWAPHINTS_PAGETRANSCOMPOUND 102
-#define ERR_SWAPHINTS_MAPCOUNT 103
 
 /**
  * Structure to hold return values from reclaim_page()
@@ -154,7 +148,6 @@ static unsigned long swaphints_swap_a_page(unsigned long pagenumber)
 {
 	struct page *page;
 	u64 pfn = pagenumber;
-	int mapcount;
 
 	page = pfn_to_page(pfn);
 
@@ -293,12 +286,11 @@ static ssize_t swaphints_write(struct file *file, const char __user *ubuf,
 	unsigned long pfn;
 	int ret = 0;
 
-	printk(KERN_INFO "swaphints_write ppos=%lld count=%ld max=%d\n", *ppos, count, swaphints_pfn_list.max);
 	/**
 	 * We're going to ignore write that too long or continued.
 	 */
 	if (*ppos > 0 || count > swaphints_pfn_list.max) {
-		printk(KERN_INFO "swaphints_write A");
+		printk(KERN_INFO "Swaphints write hit too long");
 		printk(KERN_INFO "");
 		return -EFAULT;
 	}
@@ -347,7 +339,6 @@ static ssize_t swaphints_write(struct file *file, const char __user *ubuf,
 	memset((void *)swaphints_pfn_list.buffer, 0, write_buffer_size);
 write_exit:
 	mutex_unlock(&swaphints_lock);
-	printk(KERN_INFO "Swaphints_write out '%d' '%s'\n", ret, swaphints_pfn_list.buffer);
 	return ret;
 }
 
@@ -438,12 +429,12 @@ static int swaphints_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static const struct proc_ops swaphints_proc_ops = {
-	.proc_open	= swaphints_open,
-	.proc_read	= seq_read,
-	.proc_write	= swaphints_write,
-	.proc_lseek	= seq_lseek,
-	.proc_release	= seq_release,
+static const struct file_operations swaphints_proc_ops = {
+	.open = swaphints_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release,
+	.write = swaphints_write,
 };
 
 /**

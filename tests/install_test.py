@@ -218,8 +218,11 @@ def do_check_version(configs, args, params, expected):
         print("stderr: '{}'".format(err))
         sys.stdout.flush()
     m = re.findall(params[build_style]['re'], out)
-    actual = re.sub('\033\\[([0-9]+)(;[0-9]+)*m', '', m[-1])
-    print(m)
+    if len(m) != 0:
+        actual = re.sub('\033\\[([0-9]+)(;[0-9]+)*m', '', m[-1])
+    else:
+        actual = ""
+    print(m) 
     print("stdout: '{}'".format(out))
     if expected != actual:
         print("actual: '{}' expected: '{}'".format(actual, expected))

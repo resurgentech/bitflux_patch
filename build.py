@@ -62,7 +62,7 @@ class KernelBuilder:
         # Add mirrors directory if you can
         if os.path.exists('/opt/mirrors'):
             cmd += " --volume /opt/mirrors:/opt/mirrors"
-        elif self.config['settings']['build_type'] == 'git':
+        elif self.config['settings']['build_type'] in ['git', 'gitminimal']:
             print('!!!!Building in git mode without a mirror will take a while!!!!')
         cmd += " {}".format(self.config['image_name'])
         cmd += " python3 {}".format(script)
@@ -121,7 +121,7 @@ if __name__ == '__main__':
     parser.add_argument('--distro', help='Linux distro', default="ubuntu2004", type=str)
     parser.add_argument('--buildnumber', help='Adds to package name to increment it', default="11", type=str)
     parser.add_argument('--kernel_version', help='kernel version', type=str)
-    parser.add_argument('--build_type', help='Hacks for patching and building test [distro, file, git]', default='distro', type=str)
+    parser.add_argument('--build_type', help='Hacks for patching and building test [distro, file, git, gitminimal]', default='distro', type=str)
     parser.add_argument('--jobname', help='Helpful in tracking jobs from jenkins', default="aaaaaa", type=str)
     parser.add_argument('--docker_image', help='Docker image to build kernel', default="resurgentech/kernel_build-ubuntu2004:latest", type=str)
     parser.add_argument('--checkonly', help='Return the kernel package name', action='store_true')

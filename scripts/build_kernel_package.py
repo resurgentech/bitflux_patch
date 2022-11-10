@@ -32,7 +32,7 @@ if __name__ == '__main__':
         test_kernel_build(args)
         sys.exit(0)
 
-    if args.build_type == 'git':
+    if args.build_type in ['git', 'gitminimal']:
         test_git_build(args)
         sys.exit(0)
 
