@@ -202,3 +202,8 @@ def read_json_file(filename):
     with open(filename, "r") as file:
         contents = json.load(file)
     return contents
+
+
+def write_json_file(filename, data):
+    with open(filename, "w") as file:
+        file.write(json.dumps(data, indent=4))

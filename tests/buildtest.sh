@@ -8,36 +8,49 @@ KERNEL_VERSION=$1;
 
 for i in "$@"; do
   case $i in
+    # Don't actually test
     --notest)
       NO_TEST="NO_TEST"
       shift
       ;;
+    # Patch but don't build
     --patchonly)
       PATCHONLY="--nobuild";
       shift
       ;;
+    # Don't build or patch
     --skipbuild)
       SKIPBUILD="SKIPBUILD"
       shift
       ;;
+    # Build a minimum via kernel with 
     --smallbuild)
       SMALLBUILD="SMALLBUILD"
       shift
       ;;
+    # OVERRIDE = distro to pass to build and test scripts
     --distro=*)
       DISTRO="${i#*=}"
       shift
       ;;
+    # OVERRIDE = docker_image to build kernel in
     --docker_image=*)
       DOCKER_IMAGE="${i#*=}"
       shift
       ;;
+    # OVERRIDE = vagrantbox to test in
     --vagrantbox=*)
       VAGRANTBOX="${i#*=}"
       shift
       ;;
+    # Don't remove the VM after test, for debug
     --noteardown)
       NOTEARDOWN="--noteardown"
+      shift
+      ;;
+    # Sets BitFlux APIToken for 
+    --apitoken=*)
+      BITFLUX_API_TOKEN="${i#*=}"
       shift
       ;;
     *)
@@ -96,12 +109,24 @@ else
   NO_TEST="NO_TEST"
 fi
 
+if [ -z ${BITFLUX_API_TOKEN} ]; then
+  if [ -z "${NO_TEST}" ]; then
+    BITFLUX_API_TOKEN=$(cat config.yaml | grep bitflux_api_token | awk '{print $2}')
+    if [ -z ${BITFLUX_API_TOKEN} ]; then
+      echo "Missing BitFlux API Token"
+      echo "  Either --apitoken=XXXXX or have a line in config.yaml 'bitflux_api_token: XXXX'"
+    fi
+  fi
+fi
+
+
 echo "OPTIONS:"
 echo "  NO_TEST=${NO_TEST}"
 echo "  PATCHONLY=${PATCHONLY}"
 echo "  SKIPBUILD=${SKIPBUILD}"
 echo "  SMALLBUILD=${SMALLBUILD}"
 echo "  NOTEARDOWN=${NOTEARDOWN}"
+echo "  BITFLUX_API_TOKEN=${BITFLUX_API_TOKEN}"
 echo ""
 echo " Using:"
 echo "  KERNEL_VERSION=${ACTUAL_KERNEL_VERSION}"
@@ -122,6 +147,21 @@ then
              --distro ${DISTRO} \
              --build_type ${BUILD_TYPE} \
              ${PATCHONLY};
+
+  # Make tarball
+  cd output/;
+  rm -f ../latest.tar.gz;
+  rm -f a.tar.gz;
+  tar czf a.tar.gz *.deb;
+  cd ..;
+
+  BUILD_CHECK=$(cat output/swaphints_build_output.json | grep check | awk '{print $2}' | sed 's/,$//')
+
+  if [ ${BUILD_CHECK} != "0" ]; then
+    echo "BUILD_CHECK=${BUILD_CHECK}"
+    exit 1
+  fi
+
 fi
 
 if [ ! -z ${NO_TEST} ]
@@ -130,19 +170,14 @@ then
   exit 1
 fi
 
-pushd output/;
-rm -f ../latest.tar.gz;
-rm -f a.tar.gz;
-tar czf a.tar.gz *.deb;
-popd;
-
 
 ./tests/install_test.py --vagrant_box ${VAGRANTBOX} \
                         --machine_name manualtest \
-                        --license eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJVVUlEIjoiOGM5ZTY3MzctZWFjOC00MjU0LTg2ZGMtNDIwNDRiZGRiMWQ0IiwiaWF0IjoxNjYwMjU3NDM4LCJhdWQiOiJiaXRmbHV4LmFpIiwiaXNzIjoiYml0Zmx1eC5haSJ9.oA8DVyetpWmMfcR3XZQnlSUtQ2ccNoH2qncBFtG3coA \
+                        --license ${BITFLUX_API_TOKEN} \
                         --deviceid manualtest \
                         --manual_modprobe \
                         --kernel_revision ${KERNEL_VERSION}-custom-1 \
                         --kernel_version ${KERNEL_VERSION}-custom \
                         --tarballkernel output/a.tar.gz \
                         ${NOTEARDOWN};
+exit $?

@@ -33,8 +33,8 @@ if __name__ == '__main__':
         sys.exit(0)
 
     if args.build_type in ['git', 'gitminimal']:
-        test_git_build(args)
-        sys.exit(0)
+        retval = test_git_build(args)
+        sys.exit(retval)
 
     if args.style == 'deb':
         debian_style_build(args)

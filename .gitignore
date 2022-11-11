@@ -3,3 +3,6 @@
 __pycache__
 /artifactory.json
 /output
+config.yaml
+latest.tar.gz
+README.html

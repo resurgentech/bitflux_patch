@@ -24,48 +24,63 @@ def git_checkout_kernel(build_dir, kernel_branch, giturl, git_ref_urls_path):
     return kernel_branch, filepath
 
 
-def print_debug_swaphints(out,err):
+def parse_debug_swaphints(exitcode,out,err):
+    output = {
+                "build_exitcode": exitcode,
+                "check": 0,
+                "swaphints": {
+                    "stdout": [],
+                    "stderr": []
+                },
+                "vmscan": {
+                    "stdout": [],
+                    "stderr": []
+                }
+             }
+    inputs={'stdout': out, 'stderr': err}
+    # No point moving through all this if we don't have swaphints at all
     if not "swaphints" in out:
-        return
+        output["check"] = 1
+        return output
+    # iterate through stdout and stderr
+    for stream in inputs.keys():
+        lines = inputs[stream].splitlines()
+        # look for swaphints and vmscan
+        for file in output.keys():
+            if file in ["build_exitcode","check"]:
+                continue
+            # Hack to print out the line before and 9 lines after
+            # without overlapping
+            plines = {}
+            for i in range(len(lines)):
+                if file in lines[i]:
+                    for j in range(10):
+                        plines[i+j-1]=1
+            # Now destage that record down to an array
+            k = list(plines.keys())
+            k.sort
+            for i in k:
+                if i < 0:
+                    continue
+                if i >= len(lines):
+                    continue
+                output[file][stream].append(lines[i])
+    # Validating build
+    for file in output.keys():
+        if file in ["build_exitcode", "check"]:
+            continue
+        # Should see this build
+        if len(output[file]["stdout"]) < 1:
+            output["check"] = 1
+        if len(output[file]["stderr"]) > 0:
+            output["check"] = 1
+    if output["build_exitcode"] != 0:
+        output["check"] = 1
     print("===============================")
     print("====Found Swaphints Module=====")
-    print("===========stdout==============")
-    lines = out.splitlines()
-    plines = {}
-    for i in range(len(lines)):
-        if "swaphints" in lines[i]:
-            for j in range(10):
-                plines[i+j-1]=1
-        if "vmscan" in lines[i]:
-            for j in range(10):
-                plines[i+j-1]=1
-    k = list(plines.keys())
-    k.sort
-    for i in k:
-        if i < 0:
-            continue
-        if i >= len(lines):
-            continue
-        print(lines[i])
-    print("===========stderr==============")
-    lines = err.splitlines()
-    plines = {}
-    for i in range(len(lines)):
-        if "swaphints" in lines[i]:
-            for j in range(10):
-                plines[i+j-1]=1
-        if "vmscan" in lines[i]:
-            for j in range(10):
-                plines[i+j-1]=1
-    k = list(plines.keys())
-    k.sort
-    for i in k:
-        if i < 0:
-            continue
-        if i >= len(lines):
-            continue
-        print(lines[i])
+    print(json.dumps(output, indent=4))
     print("===============================")
+    return output
 
 
 def test_git_build(args):
@@ -129,9 +144,11 @@ def test_git_build(args):
     if exitcode != 0:
         # If make dies run it single threaded to make debug easier
         run_cmd("make", workingdir=src_dir, allow_errors=True, verbose=args.verbose, live_output=True)
-    print_debug_swaphints(out, err)
+    debug_output = parse_debug_swaphints(exitcode, out, err)
+    write_json_file('./swaphints_build_output.json', debug_output)
     print("")
     print("Build exitcode={}".format(exitcode))
+    print("Build check={}".format(debug_output['check']))
     print("")
     if exitcode != 0:
         print("===============================")
@@ -141,8 +158,9 @@ def test_git_build(args):
 
     # Copy outputs
     run_cmd("rm -rf ./output;", allow_errors=True)
-    copy_outputs("./build/*.deb")
-    copy_outputs("{}/.config".format(src_dir))
-    copy_outputs("{}/mm/vmscan.c".format(src_dir))
-    copy_outputs("{}/include/linux/swap.h".format(src_dir))
-    copy_outputs("{}/*.new".format(patches_dir), outputdir='./output/patches/')
+    copy_outputs("./swaphints_build_output.json", verbose=False)
+    copy_outputs("./build/*.deb", verbose=False)
+    copy_outputs("{}/.config".format(src_dir), verbose=False)
+    copy_outputs("{}/mm/vmscan.c".format(src_dir), verbose=False)
+    copy_outputs("{}/include/linux/swap.h".format(src_dir), verbose=False)
+    copy_outputs("{}/*.new".format(patches_dir), outputdir='./output/patches/', verbose=False)
