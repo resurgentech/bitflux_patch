@@ -20,9 +20,6 @@
 #include <linux/uaccess.h>
 #include <linux/version.h>
 #include <linux/writeback.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
-#include <linux/slab.h>
-#endif
 
 
 MODULE_DESCRIPTION("Proc File Enabled Swap Hint Handler.");
@@ -36,16 +33,14 @@ MODULE_VERSION(VERSION_NUMBER);
  */
 #define ERR_SWAPHINTS_ISOLATE_LRU EINVAL
 #define ERR_SWAPHINTS_UNEVICTABLE EPERM
-#define ERR_SWAPHINTS_NOT_PAGELRU 101
-#define ERR_SWAPHINTS_PAGETRANSCOMPOUND 102
-#define ERR_SWAPHINTS_MAPCOUNT 103
 
 /**
  * Structure to hold return values from reclaim_page()
  */
 struct swaphints_status_struct {
 	u64 *pfns;
-	u64 *status;
+	u32 *status;
+	u32 *retries;
 	int head;
 	int tail;
 	int max;
@@ -56,7 +51,8 @@ struct swaphints_status_struct {
  */
 struct swaphints_status_entry {
 	u64 pfn;
-	u64 status;
+	u32 status;
+	u32 retries;
 };
 
 static DEFINE_MUTEX(swaphints_lock);
@@ -139,40 +135,36 @@ int status_max_len = 1<<21;
 module_param(status_max_len, int, 0660);
 
 /**
+ * Length of ring buffer for stashing status of pfn
+ * MUST BE power of 2 or the math doesn't work in our buffer logic.
+ */
+int reclaim_retries = 12;
+module_param(reclaim_retries, int, 0660);
+
+/**
  * Internal Function to request the reclamation of a single specific page.
  */
 static unsigned long swaphints_swap_a_page(unsigned long pagenumber)
 {
 	struct page *page;
 	u64 pfn = pagenumber;
-	int mapcount;
 
 	page = pfn_to_page(pfn);
 
-	if (!PageLRU(page))
-		return -ERR_SWAPHINTS_NOT_PAGELRU;
-
-	if (PageTransCompound(page))
-		return -ERR_SWAPHINTS_PAGETRANSCOMPOUND;
-
-	mapcount = page_mapcount(page);
-	if (mapcount != 1)
-		return -ERR_SWAPHINTS_MAPCOUNT;
-
 	ClearPageReferenced(page);
 	test_and_clear_page_young(page);
-
 	return reclaim_page(page);
 }
 
 /**
  * Add status of pfn reclaim to ring buffer
  */
-static void swaphints_push_status(u64 status, u64 pfn)
+static void swaphints_push_status(u32 status, u32 retries, u64 pfn)
 {
 	int next_head;
 	status_buffer.pfns[status_buffer.head] = pfn;
 	status_buffer.status[status_buffer.head] = status;
+	status_buffer.retries[status_buffer.head] = retries;
 	/**
 	 *  If head is already at end of buffer
 	 *  Then we are going to wrap back to zero otherwise increment
@@ -198,7 +190,7 @@ static void swaphints_push_status(u64 status, u64 pfn)
 /**
  * Remove status from ring buffer
  */
-static int swaphints_pop_status(u64 *status, u64 *pfn)
+static int swaphints_pop_status(u32 *status, u32 *retries, u64 *pfn)
 {
 	/**
 	 * Nothing if return if we're empty
@@ -207,6 +199,7 @@ static int swaphints_pop_status(u64 *status, u64 *pfn)
 		return 1;
 	*pfn = status_buffer.pfns[status_buffer.tail];
 	*status = status_buffer.status[status_buffer.tail];
+	*retries = status_buffer.retries[status_buffer.tail];
 
 	/**
 	 * If the tail is at the end of the buffer we wrap it.
@@ -232,7 +225,8 @@ static int swaphints_swap_the_pagelist(void)
 {
 	int pages_swapped = 0;
 	int i;
-	u64 status;
+	int j;
+	unsigned long status;
 	u64 pfn;
 
 	/**
@@ -240,11 +234,15 @@ static int swaphints_swap_the_pagelist(void)
 	 */
 	for (i = 0; i < swaphints_pfn_list.index; i++) {
 		pfn = swaphints_pfn_list.pfns[i];
-		status = swaphints_swap_a_page(pfn);
+		for (j = 0; j < reclaim_retries; j++) {
+			status = swaphints_swap_a_page(pfn);
+			if (status != 0)
+				break;
+		}
 		/**
 		 * Log status of each swap
 		 */
-		swaphints_push_status(status, pfn);
+		swaphints_push_status(status, j, pfn);
 		/**
 		 * Status of >0 means we successfull swapped
 		 */
@@ -288,12 +286,11 @@ static ssize_t swaphints_write(struct file *file, const char __user *ubuf,
 	unsigned long pfn;
 	int ret = 0;
 
-	printk(KERN_INFO "swaphints_write ppos=%ld count=%ld max=%d\n", *ppos, count, swaphints_pfn_list.max);
 	/**
 	 * We're going to ignore write that too long or continued.
 	 */
 	if (*ppos > 0 || count > swaphints_pfn_list.max) {
-		printk(KERN_INFO "swaphints_write A");
+		printk(KERN_INFO "Swaphints write hit too long");
 		printk(KERN_INFO "");
 		return -EFAULT;
 	}
@@ -337,12 +334,11 @@ static ssize_t swaphints_write(struct file *file, const char __user *ubuf,
 		if (swaphints_pfn_list.index == (swaphints_pfn_list.max - 1))
 			swaphints_swapnow();
 	}
-	ret = strnlen(swaphints_pfn_list.buffer, swaphints_pfn_list.max);
+	ret = strnlen(swaphints_pfn_list.buffer, write_buffer_size);
 	*ppos = ret;
 	memset((void *)swaphints_pfn_list.buffer, 0, write_buffer_size);
 write_exit:
 	mutex_unlock(&swaphints_lock);
-	printk(KERN_INFO "Swaphints_write out '%d' '%s'\n", ret, swaphints_pfn_list.buffer);
 	return ret;
 }
 
@@ -360,7 +356,7 @@ static void *swaphints_start(struct seq_file *swaphint, loff_t *pos)
 
 	mutex_lock(&swaphints_lock);
 
-	if (swaphints_pop_status(&(s->status), &(s->pfn))) {
+	if (swaphints_pop_status(&(s->status), &(s->retries), &(s->pfn))) {
 		kvfree(s);
 		return NULL;
 	}
@@ -378,7 +374,7 @@ static void *swaphints_next(struct seq_file *swaphint, void *v, loff_t *pos)
 
 	++(*pos);
 
-	if (swaphints_pop_status(&(s->status), &(s->pfn))) {
+	if (swaphints_pop_status(&(s->status), &(s->retries), &(s->pfn))) {
 		kvfree(s);
 		return NULL;
 	}
@@ -402,6 +398,8 @@ static int swaphints_show(struct seq_file *swaphint, void *v)
 	struct swaphints_status_entry *s = v;
 
 	if (seq_write(swaphint, &(s->status), sizeof(s->status)))
+		return -1;
+	if (seq_write(swaphint, &(s->retries), sizeof(s->retries)))
 		return -1;
 	if (seq_write(swaphint, &(s->pfn), sizeof(s->pfn)))
 		return -1;
@@ -431,12 +429,12 @@ static int swaphints_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static const struct proc_ops swaphints_proc_ops = {
-	.proc_open	= swaphints_open,
-	.proc_read	= seq_read,
-	.proc_write	= swaphints_write,
-	.proc_lseek	= seq_lseek,
-	.proc_release	= seq_release,
+static const struct file_operations swaphints_proc_ops = {
+	.open = swaphints_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release,
+	.write = swaphints_write,
 };
 
 /**
@@ -448,6 +446,7 @@ static void swaphints_cleanup(void)
 	kvfree(swaphints_pfn_list.buffer);
 	kvfree(status_buffer.pfns);
 	kvfree(status_buffer.status);
+	kvfree(status_buffer.retries);
 }
 
 static int __init swaphints_init(void)
@@ -493,6 +492,10 @@ static int __init swaphints_init(void)
 		return -ENOMEM;
 	}
 	if (!(status_buffer.status = kvcalloc(status_buffer.max + 1, sizeof(*status_buffer.status), GFP_KERNEL))) {
+		swaphints_cleanup();
+		return -ENOMEM;
+	}
+	if (!(status_buffer.retries = kvcalloc(status_buffer.max + 1, sizeof(*status_buffer.retries), GFP_KERNEL))) {
 		swaphints_cleanup();
 		return -ENOMEM;
 	}

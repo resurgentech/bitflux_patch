@@ -1,4 +1,3 @@
-
 extern int request_reclaim_flusher_wakeup(void)
 {
 	wakeup_flusher_threads(WB_REASON_VMSCAN);
@@ -8,6 +7,9 @@ EXPORT_SYMBOL(request_reclaim_flusher_wakeup);
 
 extern unsigned long reclaim_page(struct page *page)
 {
+	int retval;
+	LIST_HEAD(page_list);
+
 	if (isolate_lru_page(page))
 		return -EINVAL;
 
@@ -16,10 +18,10 @@ extern unsigned long reclaim_page(struct page *page)
 		return -EPERM;
 	}
 
-	LIST_HEAD(page_list);
-
 	list_add(&page->lru, &page_list);
 
-	return reclaim_pages(&page_list);
+	retval = reclaim_pages(&page_list);
+	return retval;
 }
 EXPORT_SYMBOL(reclaim_page);
+

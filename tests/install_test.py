@@ -63,7 +63,8 @@ def do_ansible(configs, script, args, extravars=None, interpreter=None):
         cmd += " --extra-vars ansible_python_interpreter={}".format(interpreter)
     if extravars is not None:
         cmd += " --extra-vars {}".format(extravars)
-    cmd += " {}".format(args.verbosity)
+    if args.verbosity is not None:
+        cmd += " -{}".format(args.verbosity)
     print("do_ansible: '{}'".format(cmd), flush=True)
     exitcode, out, err = run_cmd(cmd, live_output=True, allow_errors=True)
     sys.stdout.flush()
@@ -159,7 +160,12 @@ def install_kernel(args, configs, installer_options, installer_config):
         # Runs script with ansible to install kernel with a tarball
         installer_options['nokernel'] = ''
         installer_config['tarball'] = args.tarballkernel
-        run_cmd("mc cp {} latest.tar.gz".format(args.tarballkernel))
+        installer_config['kernel_version'] = args.kernel_version
+        # Getting tarball from either local fs or minio
+        if os.path.exists(args.tarballkernel):
+            shutil.copyfile(args.tarballkernel, 'latest.tar.gz')
+        else:
+            run_cmd("mc cp {} latest.tar.gz".format(args.tarballkernel))
         ansible_bitflux_install(configs, "install_tarballkernel.yml", args, installer_config, installer_options)
     elif args.pkgrepokernel is not None:
         # Runs script with ansible to install kernel
@@ -179,7 +185,11 @@ def install_bitflux(args, configs, installer_options, installer_config):
 
     if args.tarballbitflux is not None:
         # Runs script with ansible to install bitflux bitflux with a tarball
-        run_cmd("mc cp {} latest.tar.gz".format(args.tarballbitflux))
+        # Getting tarball from either local fs or minio
+        if os.path.exists(args.tarballbitflux):
+            shutil.copyfile(args.tarballbitflux, 'latest.tar.gz')
+        else:
+            run_cmd("mc cp {} latest.tar.gz".format(args.tarballbitflux))
         a = {}
         for k in ['license', 'deviceid']:
             a[k] = installer_options[k]
@@ -199,7 +209,7 @@ def check_build_style(configs, args):
     return 'debian'
 
 
-def do_check_packages(configs, args, params, expected):
+def do_check_version(configs, args, params, expected):
     build_style = check_build_style(configs, args)
     exitcode, out, err = do_ansible_adhoc(configs, args, params[build_style]['cmd'])
     if exitcode != 0:
@@ -208,17 +218,27 @@ def do_check_packages(configs, args, params, expected):
         print("stderr: '{}'".format(err))
         sys.stdout.flush()
     m = re.findall(params[build_style]['re'], out)
-    actual = m[-1]
-    print(m)
+    if len(m) != 0:
+        actual = re.sub('\033\\[([0-9]+)(;[0-9]+)*m', '', m[-1])
+    else:
+        actual = ""
+    print(m) 
     print("stdout: '{}'".format(out))
     if expected != actual:
-        print("actual: {} expected: {}".format(actual, expected))
+        print("actual: '{}' expected: '{}'".format(actual, expected))
         return 1
     return 0
 
 
 def check_packages(configs, args):
     test_params = {
+        'kerneltarball': {
+            'debian': {
+                're': r'\S+\s+(\S+)\s+\S+\s+\[installed',
+                'cmd': "apt list linux-image-{} -a".format(re.sub('-1$', '', args.kernel_revision))
+            },
+            'expected': None if args.tarballkernel is None else args.kernel_revision
+        },
         'kernel': {
             'redhat': {
                 're': r'\S+\s+(\S+)',
@@ -232,7 +252,7 @@ def check_packages(configs, args):
                 're': r'\S+\s+(\S+)\s+\S+\s+\[installed',
                 'cmd': "apt list linux-image-swaphints -a"
             },
-            'expected': args.kernel_revision
+            'expected': args.kernel_revision if args.tarballkernel is None else None
         },
         'bitflux': {
             'redhat': {
@@ -254,10 +274,41 @@ def check_packages(configs, args):
         expected = params['expected']
         if expected is None:
             continue
-        if do_check_packages(configs, args, params, expected):
+        if args.tarballkernel is not None and name == 'kernel':
+            continue
+        if do_check_version(configs, args, params, expected):
             print("----------------FAILED {} PACKAGE VERSION CHECK-----------------------------".format(name), flush=True)
             return 1
         print("++++++++++++++++PASSED {} PACKAGE VERSION CHECK++++++++++++++++++++++++++++".format(name), flush=True)
+    return 0
+
+
+def check_kernel_version(configs, args):
+    test_params = {
+        'unamekernel': {
+            'redhat': {
+                're': r'(\S+)',
+                'cmd': "uname -r"
+            },
+            'amazon': {
+                're': r'(\S+)',
+                'cmd': "uname -r"
+            },
+            'debian': {
+                're': r'(\S+)',
+                'cmd': "uname -r"
+            },
+            'expected': args.kernel_version
+        }
+    }
+    for name, params in test_params.items():
+        expected = params['expected']
+        if expected is None:
+            continue
+        if do_check_version(configs, args, params, expected):
+            print("----------------FAILED {} UNAME KERNEL VERSION CHECK-----------------------------".format(name), flush=True)
+            return 1
+        print("++++++++++++++++PASSED {} UNAME KERNEL VERSION CHECK++++++++++++++++++++++++++++".format(name), flush=True)
     return 0
 
 
@@ -321,21 +372,24 @@ def swapping(configs, args):
         return 0
     swaptotal = 0
     swapfree = 0
+    swapcached = 0
     for l in out.splitlines():
         b = l.split()
         if b[0].find('SwapTotal:') != -1:
             swaptotal = int(b[1])
         elif b[0].find('SwapFree:') != -1:
             swapfree = int(b[1])
-    swapped = swaptotal - swapfree
+        elif b[0].find('SwapCached:') != -1:
+            swapcached = int(b[1])
+    swapped = swaptotal - swapfree - swapcached
     # Do we see any pages swapped we'll settle for 10M
-    if swapped < 10000:
-        print("swapped: {} swaptotal: {} swapfree: {}".format(swapped, swaptotal, swapfree))
+    if (swapped < 10000) or (swapcached > swapped/10):
+        print("swapped: {} swaptotal: {} swapfree: {} swapcached: {}".format(swapped, swaptotal, swapfree, swapcached))
         #print("stdout: '{}'".format(out))
         #print("stderr: '{}'".format(err))
         sys.stdout.flush()
         return 0
-    print("swapped: {} swaptotal: {} swapfree: {}".format(swapped, swaptotal, swapfree))
+    print("swapped: {} swaptotal: {} swapfree: {} swapcached: {}".format(swapped, swaptotal, swapfree, swapcached))
     return 1
 
 
@@ -345,6 +399,12 @@ def run_tests(configs, args, loops):
         print("----------------FAILED PACKAGE VERSION CHECK-----------------------------", flush=True)
         return 1
     print("++++++++++++++++PASSED PACKAGE VERSION CHECK++++++++++++++++++++++++++++", flush=True)
+
+    # check uname version
+    if check_kernel_version(configs, args):
+        print("----------------FAILED UNAME KERNEL VERSION CHECK-----------------------------", flush=True)
+        return 1
+    print("++++++++++++++++PASSED UNAME KERNEL VERSION CHECK++++++++++++++++++++++++++++", flush=True)
 
     # check if kernel module loads
     if check_for_swaphints(configs, args):
@@ -395,13 +455,14 @@ if __name__ == '__main__':
     parser.add_argument('--noteardown', help='Don\'t clean up VMs, for debug', action='store_true')
     parser.add_argument('--no_grub_update', help='Don\'t tweak grub', action='store_true')
     parser.add_argument('--manual_modprobe', help='Force modprobe in script rather than relying on the system settings.', action='store_true')
-    parser.add_argument('--verbosity', help='verbose mode for ansible ex. -vvv', default='', type=str)
-    parser.add_argument('--tarballkernel', help='Install kernel from tarball from minio', type=str)
-    parser.add_argument('--tarballbitflux', help='Install bitflux from tarball from minio', type=str)
+    parser.add_argument('--verbosity', help='verbose mode for ansible ex. -vvv', type=str)
+    parser.add_argument('--tarballkernel', help='Install kernel from tarball from minio or local fs', type=str)
+    parser.add_argument('--tarballbitflux', help='Install bitflux from tarball from minio or local fs', type=str)
     parser.add_argument('--tarballcollector', help='[DEPRECATED] Install collector from tarball from minio', type=str)
     parser.add_argument('--collector_revision', help='[DEPRECATED] Collector revision to confirm install', type=str)
     parser.add_argument('--bitflux_revision', help='bitflux package revision to confirm install', type=str)
-    parser.add_argument('--kernel_revision', help='kernel revision to confirm install', type=str)
+    parser.add_argument('--kernel_revision', help='kernel package revision to confirm install', type=str)
+    parser.add_argument('--kernel_version', help='kernel version to kernel is running, from uname', type=str)
     parser.add_argument('--installer_url', help='override installer url', type=str)
 
     args = parser.parse_args()
@@ -462,6 +523,9 @@ if __name__ == '__main__':
 
     # No do the actual testing
     retval = run_tests(configs, args, 10)
+
+    # Look at swaphints
+    do_ansible(configs, "extract_swaphints.yml", args)
 
     # create and start vm
     if not args.noteardown:

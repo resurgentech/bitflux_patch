@@ -1,0 +1,25 @@
+diff --git a/include/linux/swap.h b/include/linux/swap.h
+index 43150b9bbc5c..5632e2d2a217 100644
+--- a/include/linux/swap.h
++++ b/include/linux/swap.h
+@@ -383,6 +383,8 @@ extern void lru_cache_add(struct page *);
+ void mark_page_accessed(struct page *);
+ void folio_mark_accessed(struct folio *);
+ 
++extern int request_reclaim_flusher_wakeup(void);
++extern unsigned long reclaim_page(struct page *page);
+ extern atomic_t lru_disable_count;
+ 
+ static inline bool lru_cache_disabled(void)
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 382dbe97329f..da4ee23e6bcc 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -2627,6 +2627,7 @@ static unsigned int reclaim_page_list(struct list_head *page_list,
+ 	return nr_reclaimed;
+ }
+ 
++//__reclaim_page.merge//
+ unsigned long reclaim_pages(struct list_head *folio_list)
+ {
+ 	int nid;

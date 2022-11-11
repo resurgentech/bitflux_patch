@@ -7,7 +7,7 @@ index 55fe2f5..d671481 100644
  					gfp_t gfp_mask, nodemask_t *mask);
  extern int __isolate_lru_page_prepare(struct page *page, isolate_mode_t mode);
 +extern int request_reclaim_flusher_wakeup(void);
-+extern int inject_reclaim_page(pg_data_t *pgdat, int order, int classzone_idx, struct page *page);
++extern unsigned long reclaim_page(struct page *page);
  extern unsigned long try_to_free_mem_cgroup_pages(struct mem_cgroup *memcg,
  						  unsigned long nr_pages,
  						  gfp_t gfp_mask,

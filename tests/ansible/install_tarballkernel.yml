@@ -12,8 +12,15 @@
     args:
       warn: false
   - name: Install kernel
-    shell: cd /tmp/latest/; apt install $(ls *.deb | sed 's/^/.\//')
+    shell: cd /tmp/latest/; apt install -y $(ls *.deb | sed 's/^/.\//')
   - name: Autoload Kernel
     shell: echo \"swaphints\" >> /etc/modules-load.d/swaphints.conf
+  - name: Download installer
+    get_url:
+      url: "{{ installer_url }}"
+      dest: "/tmp/{{ installer_filename }}"
+      mode: '0777'
+  - name: Modify Grub
+    shell: "/tmp/{{ installer_filename }} --nokernel --nobitflux --grub_update --version {{ kernel_version }}"
   - name: reboot
     reboot:

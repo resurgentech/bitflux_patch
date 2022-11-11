@@ -24,6 +24,65 @@ def git_checkout_kernel(build_dir, kernel_branch, giturl, git_ref_urls_path):
     return kernel_branch, filepath
 
 
+def parse_debug_swaphints(exitcode,out,err):
+    output = {
+                "build_exitcode": exitcode,
+                "check": 0,
+                "swaphints": {
+                    "stdout": [],
+                    "stderr": []
+                },
+                "vmscan": {
+                    "stdout": [],
+                    "stderr": []
+                }
+             }
+    inputs={'stdout': out, 'stderr': err}
+    # No point moving through all this if we don't have swaphints at all
+    if not "swaphints" in out:
+        output["check"] = 1
+        return output
+    # iterate through stdout and stderr
+    for stream in inputs.keys():
+        lines = inputs[stream].splitlines()
+        # look for swaphints and vmscan
+        for file in output.keys():
+            if file in ["build_exitcode","check"]:
+                continue
+            # Hack to print out the line before and 9 lines after
+            # without overlapping
+            plines = {}
+            for i in range(len(lines)):
+                if file in lines[i]:
+                    for j in range(10):
+                        plines[i+j-1]=1
+            # Now destage that record down to an array
+            k = list(plines.keys())
+            k.sort
+            for i in k:
+                if i < 0:
+                    continue
+                if i >= len(lines):
+                    continue
+                output[file][stream].append(lines[i])
+    # Validating build
+    for file in output.keys():
+        if file in ["build_exitcode", "check"]:
+            continue
+        # Should see this build
+        if len(output[file]["stdout"]) < 1:
+            output["check"] = 1
+        if len(output[file]["stderr"]) > 0:
+            output["check"] = 1
+    if output["build_exitcode"] != 0:
+        output["check"] = 1
+    print("===============================")
+    print("====Found Swaphints Module=====")
+    print(json.dumps(output, indent=4))
+    print("===============================")
+    return output
+
+
 def test_git_build(args):
     """
     Testing vanilla kernel from git
@@ -46,7 +105,7 @@ def test_git_build(args):
 
     if init_commit is not None:
         filepath = os.path.join(patches_dir, "complete.patch")
-        commit_and_create_patch(kernel_version, src_dir, commit_hash=init_commit, verbose=args.verbose)
+        commit_and_create_patch(filepath, src_dir, commit_hash=init_commit, verbose=args.verbose)
     print("Patching Complete")
     sys.stdout.flush()
     sleep(3)
@@ -54,20 +113,54 @@ def test_git_build(args):
 
     # Run kernel build
     if args.nobuild:
+        run_cmd("rm -rf ./output;", allow_errors=True)
+        copy_outputs("{}/*.new".format(patches_dir), outputdir='./output/patches/')
         return
 
-    # We're going to build ubuntu debs
-    run_cmd("cp /boot/config-$(uname -r) .config", workingdir=src_dir, allow_errors=False, verbose=args.verbose)
-    run_cmd("make olddefconfig", workingdir=src_dir, allow_errors=False, verbose=args.verbose)
+    if args.build_type == 'gitminimal':
+        run_cmd("make tinyconfig", workingdir=src_dir, allow_errors=False, verbose=args.verbose)
+        run_cmd("./scripts/config --enable PROC_FS", workingdir=src_dir, allow_errors=False, verbose=True)
+        run_cmd("./scripts/config --enable MODULES", workingdir=src_dir, allow_errors=False, verbose=True)
+        run_cmd("./scripts/config --enable NUMA", workingdir=src_dir, allow_errors=False, verbose=True)
+    else:
+        # We're going to build ubuntu debs
+        run_cmd("cp /boot/config-$(uname -r) .config", workingdir=src_dir, allow_errors=False, verbose=args.verbose)
+        run_cmd("make olddefconfig", workingdir=src_dir, allow_errors=False, verbose=args.verbose)
+    run_cmd("./scripts/config --enable TRANSPARENT_HUGEPAGE", workingdir=src_dir, allow_errors=False, verbose=True)
+    run_cmd("./scripts/config --enable TRANSPARENT_HUGEPAGE_ALWAYS", workingdir=src_dir, allow_errors=False, verbose=True)
+    run_cmd("./scripts/config --enable TRANSPARENT_HUGEPAGE_MADVISE", workingdir=src_dir, allow_errors=False, verbose=True)
     run_cmd("./scripts/config --disable SYSTEM_TRUSTED_KEYS", workingdir=src_dir, allow_errors=False, verbose=args.verbose)
     run_cmd("./scripts/config --disable SYSTEM_REVOCATION_KEYS", workingdir=src_dir, allow_errors=False, verbose=args.verbose)
     run_cmd("make olddefconfig", workingdir=src_dir, allow_errors=False, verbose=args.verbose)
-    exitcode, _, _ = run_cmd("make -j $(nproc) deb-pkg LOCALVERSION=-custom", workingdir=src_dir, allow_errors=True, live_output=True, verbose=args.verbose)
+    run_cmd("./scripts/config --enable DEBUG_INFO_NONE", workingdir=src_dir, allow_errors=False, verbose=args.verbose)
+    run_cmd("./scripts/config --disable DEBUG_INFO", workingdir=src_dir, allow_errors=False, verbose=args.verbose)
+    run_cmd("./scripts/config --disable DEBUG_INFO_DWARF5", workingdir=src_dir, allow_errors=False, verbose=args.verbose)
+
+    if args.build_type == 'gitminimal':
+        cmd = "make -j $(nproc)"
+    else:
+        cmd = "make -j $(nproc) deb-pkg LOCALVERSION=-custom"
+    exitcode, out, err = run_cmd(cmd, workingdir=src_dir, allow_errors=True, live_output=True, verbose=args.verbose)
     if exitcode != 0:
         # If make dies run it single threaded to make debug easier
         run_cmd("make", workingdir=src_dir, allow_errors=True, verbose=args.verbose, live_output=True)
+    debug_output = parse_debug_swaphints(exitcode, out, err)
+    write_json_file('./swaphints_build_output.json', debug_output)
+    print("")
+    print("Build exitcode={}".format(exitcode))
+    print("Build check={}".format(debug_output['check']))
+    print("")
+    if exitcode != 0:
+        print("===============================")
+        print("=========Build STDERR==========")
+        print(err)
+        print("===============================")
 
     # Copy outputs
     run_cmd("rm -rf ./output;", allow_errors=True)
-    copy_outputs("./build/*.deb")
-    copy_outputs("{}/*.new".format(patches_dir), outputdir='./output/patches/')
+    copy_outputs("./swaphints_build_output.json", verbose=False)
+    copy_outputs("./build/*.deb", verbose=False)
+    copy_outputs("{}/.config".format(src_dir), verbose=False)
+    copy_outputs("{}/mm/vmscan.c".format(src_dir), verbose=False)
+    copy_outputs("{}/include/linux/swap.h".format(src_dir), verbose=False)
+    copy_outputs("{}/*.new".format(patches_dir), outputdir='./output/patches/', verbose=False)
