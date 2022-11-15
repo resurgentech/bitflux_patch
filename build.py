@@ -37,6 +37,8 @@ class KernelBuilder:
         self.done()
 
     def build_docker_image(self):
+        if self.config['nodocker']:
+            return
         print("==============================================================================")
         print("=== BUILD DOCKER IMAGE =======================================================")
         print("==============================================================================")
@@ -175,7 +177,7 @@ if __name__ == '__main__':
         config['docker_image'] = config['settings']['docker_image']
         del config['settings']['docker_image']
 
-    print(config)
+    print(json.dumps(config, indent=4))
 
     # Only check for kernel
     if args.checkonly:
