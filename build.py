@@ -37,6 +37,8 @@ class KernelBuilder:
         self.done()
 
     def build_docker_image(self):
+        if self.config['nodocker']:
+            return
         print("==============================================================================")
         print("=== BUILD DOCKER IMAGE =======================================================")
         print("==============================================================================")
@@ -47,7 +49,7 @@ class KernelBuilder:
         template_path = os.path.join(self.config['basedir'], 'scripts', 'Dockerfile.j2')
         output_path = os.path.join(self.config['basedir'], 'Dockerfile')
         compile_j2_template(template_path, output_path, self.config)
-        if self.config.get('nopull', None) is None:
+        if not self.config['nopull']:
             self.run_cmd("docker pull {}".format(self.config['docker_image']))
         self.run_cmd("docker rm --force {}".format(self.config['container_name']))
         self.run_cmd("docker rmi --force {}".format(self.config['image_name']))
@@ -64,32 +66,42 @@ class KernelBuilder:
             cmd += " --volume /opt/mirrors:/opt/mirrors"
         elif self.config['settings']['build_type'] in ['git', 'gitminimal']:
             print('!!!!Building in git mode without a mirror will take a while!!!!')
-        cmd += " {}".format(self.config['image_name'])
-        cmd += " python3 {}".format(script)
+        cmd += " {} ".format(self.config['image_name'])
+        cmd += script
+        self.run_cmd(cmd, no_stdout=no_stdout)
+
+    def run(self, script, no_stdout=False):
+        cmd = "python3 {}".format(script)
         for k,v in self.config['settings'].items():
             if v is True:
                 cmd += " --{}".format(k)
             else:
                 cmd += " --{} {}".format(k,v)
-        self.run_cmd(cmd, no_stdout=no_stdout)
+        if self.config['nodocker']:
+            self.run_cmd(cmd, no_stdout=no_stdout)
+        else:
+            self.run_docker(cmd, no_stdout=no_stdout)
+
 
     def build_kernel_package(self):
         print("==============================================================================")
         print("=== BUILD KERNEL PACKAGE =====================================================")
         print("==============================================================================")
-        self.run_docker("./scripts/build_kernel_package.py", no_stdout=True)
+        self.run("./scripts/build_kernel_package.py", no_stdout=True)
 
     def check_kernel_package(self):
         print("==============================================================================")
         print("=== CHECK KERNEL PACKAGE =====================================================")
         print("==============================================================================")
-        self.run_docker("./scripts/check_package.py", no_stdout=True)
+        self.run("./scripts/check_package.py", no_stdout=True)
 
     def copy_output_from_container(self):
+        if self.config['nodocker']:
+            return
         print("==============================================================================")
         print("=== COPY OUTPUT FROM CONTAINER ===============================================")
         print("==============================================================================")
-        if self.config.get('dumpall', None) is None:
+        if not self.config['dumpall']:
             self.run_cmd("docker cp {}:/bitflux/output .".format(self.config['container_name']))
         else:
             self.run_cmd("rm -rf dumpall")
@@ -97,12 +109,16 @@ class KernelBuilder:
             self.run_cmd("docker cp {}:/bitflux/ dumpall".format(self.config['container_name']))
 
     def copy_package_name_from_container(self):
+        if self.config['nodocker']:
+            return
         print("==============================================================================")
         print("=== COPY PACKAGENAME FROM CONTAINER ==========================================")
         print("==============================================================================")
         self.run_cmd("docker cp {}:/bitflux/package.yaml .".format(self.config['container_name']))
 
     def cleanup(self):
+        if self.config['nodocker']:
+            return
         print("==============================================================================")
         print("=== CLEAN UP DOCKER IMAGE AND CONTAINER ======================================")
         print("==============================================================================")
@@ -124,6 +140,7 @@ if __name__ == '__main__':
     parser.add_argument('--build_type', help='Hacks for patching and building test [distro, file, git, gitminimal]', default='distro', type=str)
     parser.add_argument('--jobname', help='Helpful in tracking jobs from jenkins', default="aaaaaa", type=str)
     parser.add_argument('--docker_image', help='Docker image to build kernel', default="resurgentech/kernel_build-ubuntu2004:latest", type=str)
+    parser.add_argument('--nodocker', help="Don't run in Docker", action='store_true')
     parser.add_argument('--checkonly', help='Return the kernel package name', action='store_true')
     parser.add_argument('--verbose', help='Verbose mode - DEBUG', action='store_true')
     parser.add_argument('--dumpall', help='Dump everything from the container - DEBUG', action='store_true')
@@ -139,13 +156,11 @@ if __name__ == '__main__':
     config['container_name'] = args.jobname
     config['image_name'] = "resurgentech_local/{}:latest".format(args.jobname)
     config['verbose'] = args.verbose
-    if args.dumpall:
-        config['dumpall'] = args.dumpall
-    if args.nopull:
-        config['nopull'] = args.nopull
-    if args.settings is None:
-        config['settings'] = {}
-    else:
+    config['dumpall'] = args.dumpall
+    config['nopull'] = args.nopull
+    config['nodocker'] = args.nodocker
+    config['settings'] = {}
+    if args.settings is not None:
         config['settings'] = json.loads(args.settings)
     config['settings']['buildnumber'] = args.buildnumber
     config['settings']['distro'] = args.distro
@@ -162,7 +177,7 @@ if __name__ == '__main__':
         config['docker_image'] = config['settings']['docker_image']
         del config['settings']['docker_image']
 
-    print(config)
+    print(json.dumps(config, indent=4))
 
     # Only check for kernel
     if args.checkonly:

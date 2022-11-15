@@ -21,6 +21,6 @@
       dest: "/tmp/{{ installer_filename }}"
       mode: '0777'
   - name: Modify Grub
-    shell: "/tmp/{{ installer_filename }} --nokernel --nobitflux --grub_update --version {{ kernel_version }}"
+    shell: "/tmp/{{ installer_filename }} --nokernel --nobitflux --grub_update"
   - name: reboot
     reboot:

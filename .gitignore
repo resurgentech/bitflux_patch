@@ -3,6 +3,8 @@
 __pycache__
 /artifactory.json
 /output
+/machines
+machines.yaml
 config.yaml
 latest.tar.gz
 README.html
