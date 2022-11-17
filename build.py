@@ -162,6 +162,8 @@ if __name__ == '__main__':
     config['settings'] = {}
     if args.settings is not None:
         config['settings'] = json.loads(args.settings)
+    # if --settings has nodocker, use it
+    config['nodocker'] = config['settings'].get('nodocker', False)
     config['settings']['buildnumber'] = args.buildnumber
     config['settings']['distro'] = args.distro
     config['settings']['build_type'] = args.build_type
