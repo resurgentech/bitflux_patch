@@ -85,13 +85,15 @@ def apply_patch_deprecated(path, src_dir, clean_patch, allow_errors=False, verbo
 
 def apply_patch(path, src_dir, clean_patch, allow_errors=False, verbose=False):
     print("\tPatching {}".format(path))
-    exitcode, _, _ = run_cmd("patch -p1 -F 100 -i {}".format(path), workingdir=src_dir, allow_errors=True, verbose=verbose)
+    patch_cmd = "patch -p1 -F 100 -i {}".format(path)
+    exitcode, stdout, stderr = run_cmd(patch_cmd, workingdir=src_dir, allow_errors=True, verbose=verbose)
     # Clean up leftovers
     cmd = "find . | grep .orig$ | sed 's/^/rm /' | bash"
     run_cmd(cmd, workingdir=src_dir, allow_errors=True, verbose=verbose)
     cmd = "find . | grep .rej$ | sed 's/^/rm /' | bash"
     run_cmd(cmd, workingdir=src_dir, allow_errors=True, verbose=verbose)
     if exitcode != 0 and not allow_errors:
+        print_run_cmd(patch_cmd, exitcode, stdout, stderr)
         sys.stdout.flush()
         sleep(1)
         raise
