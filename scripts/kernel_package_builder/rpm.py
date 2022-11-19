@@ -11,7 +11,7 @@ def dnf_update_upgrade(allow_errors=False, verbose=False, live_output=False):
     """
     Update and upgrade rpm repos to latest
     """
-    run_cmd("sudo dnf update -y", allow_errors=allow_errors, verbose=verbose, live_output=live_output)
+    run_cmd("dnf update -y", allow_errors=allow_errors, verbose=verbose, live_output=live_output)
 
 
 def dnf_get_srpm(kernel_version, distro, allow_errors=False, verbose=True, builddir='./build'):
@@ -33,9 +33,9 @@ def dnf_get_elrepo_kernel_srpm(kernel_version, allow_errors=False, verbose=True,
     """
     run_cmd("mkdir -p {}".format(builddir), verbose=verbose)
     if kernel_version is None:
-        cmd = "sudo dnf download --enablerepo=elrepo-kernel  kernel-lt"
+        cmd = "dnf download --enablerepo=elrepo-kernel  kernel-lt"
     else:
-        cmd = "sudo dnf download --enablerepo=elrepo-kernel  kernel-lt-{}".format(kernel_version)
+        cmd = "dnf download --enablerepo=elrepo-kernel  kernel-lt-{}".format(kernel_version)
     run_cmd(cmd, workingdir=builddir, allow_errors=allow_errors, verbose=verbose)
     files = [f.path for f in os.scandir("{}".format(builddir)) if f.is_file()]
     if len(files) == 2:
@@ -68,9 +68,9 @@ def dnf_get_standard_kernel_srpm(kernel_version, allow_errors=False, verbose=Tru
     """
     run_cmd("mkdir -p {}".format(builddir), verbose=verbose)
     if kernel_version is None:
-        cmd = "sudo dnf download --source --disablerepo=updates kernel"
+        cmd = "dnf download --source --disablerepo=updates kernel"
     else:
-        cmd = "sudo dnf download --source kernel-{}".format(kernel_version)
+        cmd = "dnf download --source kernel-{}".format(kernel_version)
     run_cmd(cmd, workingdir=builddir, allow_errors=allow_errors, verbose=verbose)
     files = [f.path for f in os.scandir("{}".format(builddir)) if f.is_file()]
     if len(files) == 2:

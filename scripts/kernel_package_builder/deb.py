@@ -9,9 +9,9 @@ def apt_update_upgrade(allow_errors=False, verbose=False, live_output=False):
     """
     Update and upgrade apt repos to latest
     """
-    run_cmd("sudo apt autoremove -y", allow_errors=allow_errors, verbose=verbose, live_output=live_output)
-    run_cmd("sudo apt update", allow_errors=allow_errors, verbose=verbose, live_output=live_output)
-    run_cmd("DEBIAN_FRONTEND=noninteractive sudo apt upgrade -y", allow_errors=allow_errors, verbose=verbose, live_output=live_output)
+    run_cmd("apt autoremove -y", allow_errors=allow_errors, verbose=verbose, live_output=live_output)
+    run_cmd("apt update", allow_errors=allow_errors, verbose=verbose, live_output=live_output)
+    run_cmd("DEBIAN_FRONTEND=noninteractive apt upgrade -y", allow_errors=allow_errors, verbose=verbose, live_output=live_output)
 
 
 def apt_list_linux_images(searchfactor, allow_errors=False, verbose=False):
@@ -20,7 +20,7 @@ def apt_list_linux_images(searchfactor, allow_errors=False, verbose=False):
 
     :return: array of {name: imagename, description: description_string}
     """
-    _, out, _ = run_cmd("sudo apt-cache search linux", allow_errors=allow_errors, verbose=verbose)
+    _, out, _ = run_cmd("apt-cache search linux", allow_errors=allow_errors, verbose=verbose)
     raw_list = out.splitlines()
     image_list = []
     for rawline in raw_list:

@@ -11,7 +11,7 @@ def yum_update_upgrade(allow_errors=False, verbose=False, live_output=False):
     """
     Update and upgrade rpm repos to latest
     """
-    run_cmd("sudo yum update -y", allow_errors=allow_errors, verbose=verbose, live_output=live_output)
+    run_cmd("yum update -y", allow_errors=allow_errors, verbose=verbose, live_output=live_output)
 
 
 def yum_get_srpm(kernel_version, distro, allow_errors=False, verbose=True, builddir='./build'):
@@ -33,9 +33,9 @@ def yum_get_elrepo_kernel_srpm(kernel_version, allow_errors=False, verbose=True,
     """
     run_cmd("mkdir -p {}".format(builddir), verbose=verbose)
     if kernel_version is None:
-        cmd = "sudo yum download --enablerepo=elrepo-kernel  kernel-lt"
+        cmd = "yum download --enablerepo=elrepo-kernel  kernel-lt"
     else:
-        cmd = "sudo yum download --enablerepo=elrepo-kernel  kernel-lt-{}".format(kernel_version)
+        cmd = "yum download --enablerepo=elrepo-kernel  kernel-lt-{}".format(kernel_version)
     run_cmd(cmd, workingdir=builddir, allow_errors=allow_errors, verbose=verbose)
     files = [f.path for f in os.scandir("{}".format(builddir)) if f.is_file()]
     if len(files) == 2:
@@ -68,9 +68,9 @@ def yum_get_standard_kernel_srpm(kernel_version, allow_errors=False, verbose=Tru
     """
     run_cmd("mkdir -p {}".format(builddir), verbose=verbose)
     if kernel_version is None:
-        cmd = "sudo yumdownloader --source kernel"
+        cmd = "yumdownloader --source kernel"
     else:
-        cmd = "sudo yum download --source kernel-{}".format(kernel_version)
+        cmd = "yum download --source kernel-{}".format(kernel_version)
     run_cmd(cmd, workingdir=builddir, allow_errors=allow_errors, verbose=verbose)
     files = [f.path for f in os.scandir("{}".format(builddir)) if f.is_file()]
     if len(files) == 2:
