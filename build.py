@@ -158,7 +158,6 @@ if __name__ == '__main__':
     config['verbose'] = args.verbose
     config['dumpall'] = args.dumpall
     config['nopull'] = args.nopull
-    config['nodocker'] = args.nodocker
     config['settings'] = {}
     if args.settings is not None:
         config['settings'] = json.loads(args.settings)
@@ -166,6 +165,8 @@ if __name__ == '__main__':
     config['nodocker'] = config['settings'].get('nodocker', False)
     if config['settings'].get('nodocker', None) is not None:
         del config['settings']['nodocker']
+    if args.nodocker:
+        config['nodocker'] = True
     config['settings']['buildnumber'] = args.buildnumber
     config['settings']['distro'] = args.distro
     config['settings']['build_type'] = args.build_type
