@@ -7,6 +7,7 @@ import sys
 import glob
 import shutil
 import json
+import yaml
 import pty
 import select
 import errno
@@ -223,3 +224,10 @@ def read_json_file(filename):
 def write_json_file(filename, data):
     with open(filename, "w") as file:
         file.write(json.dumps(data, indent=4))
+
+
+def read_yaml_file(filename):
+    with open(filename, "r") as file:
+        contents = file.read()
+    output = yaml.load(contents, Loader=yaml.Loader)
+    return output

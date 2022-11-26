@@ -3,6 +3,7 @@
 from .common import *
 from .patching import *
 from jinja2 import Template
+import yaml
 
 
 def apt_update_upgrade(allow_errors=False, verbose=False, live_output=False):
@@ -14,52 +15,75 @@ def apt_update_upgrade(allow_errors=False, verbose=False, live_output=False):
     run_cmd("DEBIAN_FRONTEND=noninteractive apt upgrade -y", allow_errors=allow_errors, verbose=verbose, live_output=live_output)
 
 
-def apt_list_linux_images(searchfactor, allow_errors=False, verbose=False):
-    """
-    Look up list of linux images from apt
+def apt_linux_version_fair_name(name):
+    # Version can have sections segmented '~' '-' let's make it all '.'
+    fixedname1 = name.replace('-', '.')
+    fixedname2 = fixedname1.replace('~', '.')
+    a = fixedname2.split('.')
+    a2 = []
+    # Just zero pad the sections to make it fair when sorting
+    # like 5.4 should be lower ranked than 5.15
+    for b in a:
+        if len(str(b)) > 15:
+            print("did not plan for this name='{}'".format(name))
+            raise
+        a2.append(str(b).zfill(16))
+    for i in range(16-len(a)):
+        a2.append("0".zfill(16))
+    output = '.'.join(a2)
+    return output
 
-    :return: array of {name: imagename, description: description_string}
+
+def apt_cache_show(search_pkg, allow_errors=False, verbose=False):
     """
-    _, out, _ = run_cmd("apt-cache search linux", allow_errors=allow_errors, verbose=verbose)
-    raw_list = out.splitlines()
-    image_list = []
-    for rawline in raw_list:
-        quitter = False
-        a = rawline.split(' - ')
-        b = {'name': a[0], 'description': a[1]}
-        for factor in searchfactor:
-            if not re.search(factor, b['name']):
-                quitter = True
-        if not quitter:
-            image_list.append(b)
-    return image_list
+    Look up list of linux images from apt-cache
+
+    :return: array of [{}]
+    """
+    _, out, _ = run_cmd("apt-cache show {}".format(search_pkg), allow_errors=allow_errors, verbose=verbose)
+    sections = []
+    section = []
+    for line in out.splitlines():
+        if line == "":
+            sections.append("\n".join(section))
+        section.append(line)
+    output = []
+    for section in sections:
+        output.append(yaml.load(section))
+    for section in output:
+        for k, v in section.items():
+            # Let's process any entries that are lists
+            v1 = str(v).split(',')
+            if len(v1) > 1:
+                v2 = []
+                for a in v1:
+                    v2.append(a.strip())
+                section[k] = v2
+        # We want to sort on Version but it's weird so let's pad it to make it work
+        section['sorthelper'] = apt_linux_version_fair_name(section["Version"])
+    return output
 
 
 def debsrc_list_srt_func(elem):
-    versioncalculated=0
-    m = re.search("(\d\.\d+\.\d+\-\d+)", str(elem))
-    a = m.group(0)
-    print(a)
-    #if a.endswith(".0"):
-    #    a = a.rstrip(".0")
-    versionparts = re.split(r"\.|-", a)
-    print(versionparts)
-    versioncalculated += int(versionparts[0])*10000000 
-    versioncalculated += int(versionparts[1])*100000 
-    versioncalculated += int(versionparts[2])*1000 
-    versioncalculated += int(versionparts[3]) 
-    return versioncalculated
+    return elem['sorthelper']
 
 
-def apt_get_linux_image_name(searchfactor, allow_errors=False, verbose=False):
+def apt_get_linux_image_name(search_pkg, allow_errors=False, verbose=False):
     """
     Return the newest latest linux kernel image package name
     """
-    image_list = apt_list_linux_images(searchfactor, allow_errors=allow_errors, verbose=verbose)
+    image_list = apt_cache_show(search_pkg, allow_errors=allow_errors, verbose=verbose)
+
+    # sort list on sorthelper key
     sorted_image_list = sorted(image_list, key=debsrc_list_srt_func)
-    image = sorted_image_list[-1]
-    print(image)
-    return image['name']
+    fullimage = sorted_image_list[-1]
+
+    if isinstance(fullimage["Depends"], list):
+        rawversion = fullimage["Depends"][0]
+    else:
+        rawversion = fullimage["Depends"]
+    image = rawversion.split(" ")[0]
+    return image
 
 
 def apt_get_source(image_name, allow_errors=False, verbose=False, builddir='./build'):
@@ -257,8 +281,6 @@ def build_meta_pkg(ver_ref_pkg, pkg_filters, metapkg_template, allow_errors=Fals
 
 # Find package without building
 def get_package_deb(args):
-    image_searchfactors = json.loads(args.image_searchfactors)
-
     # Update and upgrade apt repos to latest
     apt_update_upgrade(allow_errors=True, live_output=False)
     print("apt repos updated and upgraded")
@@ -266,7 +288,7 @@ def get_package_deb(args):
     sleep(3)
 
     # Return the newest latest linux kernel image package name
-    image_name = apt_get_linux_image_name(image_searchfactors, verbose=False)
+    image_name = apt_get_linux_image_name(args.search_pkg, verbose=False)
     print("Found image name:           {}".format(image_name))
     sys.stdout.flush()
     return image_name
@@ -281,8 +303,8 @@ def printfancy(str, timeout=0.1):
 
 
 def debian_style_build(args):
-    image_searchfactors = json.loads(args.image_searchfactors)
     ver_ref_pkg = args.ver_ref_pkg
+    search_pkg = args.search_pkg
     pkg_filters = json.loads(args.pkg_filters)
     metapkg_template = args.metapkg_template
     printfancy("BUILDING DEBIAN STYLE PACKAGE")
@@ -296,7 +318,7 @@ def debian_style_build(args):
     printfancy("Set bitflux_version:        {}".format(bitflux_version), timeout=3)
 
     # Return the newest latest linux kernel image package name
-    image_name = apt_get_linux_image_name(image_searchfactors, verbose=args.verbose)
+    image_name = apt_get_linux_image_name(search_pkg, verbose=args.verbose)
     printfancy("Found image name:           {}".format(image_name))
 
     # Search patches for something that should match the kernel image package

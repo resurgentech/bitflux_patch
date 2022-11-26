@@ -12,10 +12,12 @@ if __name__ == '__main__':
     parser.add_argument('--kernel_version', help='kernel version', type=str)
     parser.add_argument('--build_type', help='Hacks for patching and building test [distro, file, git]', default='distro', type=str)
     parser.add_argument('--style', help='which package style [rpm, deb]', default='deb', type=str)
-    parser.add_argument('--image_searchfactors', help='For .deb, find the kernel package', default='["^linux-image-unsigned-", "generic$"]', type=str)
+
     parser.add_argument('--ver_ref_pkg', help='For .deb, reference pkg search', default='linux-image-unsigned', type=str)
+    parser.add_argument('--search_pkg', help='For .deb, reference pkg search', default='linux-image-generic', type=str)
     parser.add_argument('--pkg_filters', help='For .deb, which pkgs to deal with', default='["hwe", "cloud", "dkms", "tools", "buildinfo"]', type=str)
-    parser.add_argument('--metapkg_template', help='For .dev, what to call new package', default='linux-image-swaphints', type=str)
+    parser.add_argument('--metapkg_template', help='For .deb, what to call new package', default='linux-image-swaphints', type=str)
+
     parser.add_argument('--nobuild', help='Don\'t build', action='store_true')
     parser.add_argument('--clean', help='Extra clean up steps', action='store_true')
     parser.add_argument('--verbose', help='verbose', action='store_true')
@@ -23,6 +25,12 @@ if __name__ == '__main__':
     parser.add_argument('--giturl', help='git repo url', default='https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git', type=str)
 
     args = parser.parse_args()
+
+    print("!----------------------------------------------------------------------------")
+    print("!-- Args into {}".format(__file__))
+    print("-----------------------------------------------------------------------------")
+    print(yaml.dump(vars(args)))
+    print("!----------------------------------------------------------------------------")
 
     if args.build_type == 'file':
         if args.kernel_version is None:
