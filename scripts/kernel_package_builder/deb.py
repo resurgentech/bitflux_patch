@@ -193,11 +193,11 @@ def deb_hack_abi_records(flavour, debian_dir, verbose=True):
     filelist = [f.path for f in os.scandir(abi_dir) if not f.is_dir()]
     for f in filelist:
         a = os.path.basename(f)
-        b = a.split('generic')
-        if len(b) == 0:
+        b = a.split('.')
+        if b[0] != 'generic':
             continue
         b[0] = flavour
-        c = ''.join(b)
+        c = '.'.join(b)
         d = os.path.dirname(f)
         newf = os.path.join(d,c)
         print("src={}  dst={}".format(f, newf))
