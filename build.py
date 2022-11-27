@@ -76,7 +76,10 @@ class KernelBuilder:
             if v is True:
                 cmd += " --{}".format(k)
             else:
-                cmd += " --{} {}".format(k,v)
+                if isinstance(v, str):
+                    cmd += " --{} {}".format(k,v)
+                else:
+                    cmd += " --{} {}".format(k,json.dumps(json.dumps(v)))
         if self.config['nodocker']:
             self.run_cmd(cmd, no_stdout=no_stdout)
         else:
@@ -152,18 +155,21 @@ def fill_configs(args):
         # 1) If we get the --settings on the cli we're going to just use it
         config['settings'] = json.loads(args.settings)
         config['settings']['distro'] = args.distro
-        config['settings']['build_type'] = 'distro'
     elif args.distro_config is not None:
         # 2) Let's read this from a config file
         distro_config = read_yaml_file(args.distro_config)
         config['settings'] = distro_config['build']['kernel']
-        config['settings']['build_type'] = 'distro'
         config['settings']['distro'] = distro_config['name']
     else:
         # 3) Make a 'settings' dict from the commandline options
         config['settings'] = {}
-        for arg in ['ver_ref_pkg', 'search_pkg', 'pkg_filters', 'metapkg_template', 'distro', 'build_type', 'kernel_version']:
+        for arg in ['ver_ref_pkg', 'search_pkg', 'pkg_filters', 'metapkg_template', 'distro']:
             if dargs.get(arg, False):
+                config['settings'][arg] = dargs[arg]
+
+    for arg in ['build_type', 'kernel_version']:
+        if dargs.get(arg, False):
+            if not config['settings'].get(arg, False):
                 config['settings'][arg] = dargs[arg]
 
     for arg in ['clean', 'nobuild','buildnumber']:

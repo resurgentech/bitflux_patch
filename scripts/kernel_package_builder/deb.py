@@ -49,7 +49,7 @@ def apt_cache_show(search_pkg, allow_errors=False, verbose=False):
         section.append(line)
     output = []
     for section in sections:
-        output.append(yaml.load(section))
+        output.append(yaml.load(section, Loader=yaml.Loader))
     for section in output:
         for k, v in section.items():
             # Let's process any entries that are lists
@@ -169,12 +169,27 @@ def deb_hack_changelog(bitflux_version, src_dir, buildnum=None, verbose=True, cl
     sleep(1)
 
 
+def deb_get_abi_dir(debian_dir):
+    abi_dir = os.path.join(debian_dir, 'abi')
+    dirlist = [f.path for f in os.scandir(abi_dir) if f.is_dir()]
+    # Some of these build have the directory here
+    if os.path.join(abi_dir, 'amd64') in dirlist:
+        return os.path.join(abi_dir, 'amd64')
+    # Others have another dir in here
+    if len(dirlist) != 1:
+        print("I don't know how to handle this")
+        print("dirlist={}".format(dirlist))
+        raise
+    return os.path.join(dirlist[0], 'amd64')
+
+
 def deb_hack_abi_records(flavour, debian_dir, verbose=True):
     '''
     Copies debian.master/abi/amd64/generic* to debian.master/abi/amd64/'flavour'*
+     or debian.master/abi/xxx/amd64/generic* to debian.master/abi/xxx/amd64/'flavour'*
     Because the build wants them to check stuff from the previous build
     '''
-    abi_dir = os.path.join(debian_dir, 'abi','amd64')
+    abi_dir = deb_get_abi_dir(debian_dir)
     filelist = [f.path for f in os.scandir(abi_dir) if not f.is_dir()]
     for f in filelist:
         a = os.path.basename(f)
@@ -328,7 +343,7 @@ def debian_style_build(args):
         raise
 
     # Download source code and return where the kernel source code is located
-    src_dir = apt_get_source(image_name, verbose=args.verbose)
+    src_dir = apt_get_source('linux', verbose=args.verbose)
     printfancy("Found kernel src directory: {}".format(src_dir))
 
     debian_dir = deb_find_debian_dir(src_dir)
