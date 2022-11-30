@@ -1,8 +1,12 @@
-diff --git a/debian/dkms-versions b/debian/dkms-versions
-index e732270..0fa5caf 100644
---- a/debian/dkms-versions
-+++ b/debian/dkms-versions
-@@ -1,3 +1,2 @@
- zfs-linux 0.8.3-1ubuntu12.14
--virtualbox 6.1.38-dfsg-3~ubuntu1.20.04.1
- wireguard-linux-compat 1.0.20201112-1~20.04.1
+diff --git a/debian.master/rules.d/amd64.mk b/debian.master/rules.d/amd64.mk
+index 2e9856543..a3a7478e3 100644
+--- a/debian.master/rules.d/amd64.mk
++++ b/debian.master/rules.d/amd64.mk
+@@ -22,6 +22,6 @@ do_extras_package = true
+ do_tools_common = true
+ do_tools_acpidbg = true
+ do_zfs         = true
+-do_dkms_vbox    = true
++do_dkms_vbox    = false
+ do_dkms_wireguard = true
+ do_odm_drivers    = true
