@@ -165,7 +165,10 @@ def fill_configs(args):
         config['settings'] = {}
         for arg in ['ver_ref_pkg', 'search_pkg', 'pkg_filters', 'metapkg_template', 'distro']:
             if dargs.get(arg, False):
-                config['settings'][arg] = dargs[arg]
+                if arg in ['pkg_filters']:
+                    config['settings'][arg] = json.loads(dargs[arg])
+                else:
+                    config['settings'][arg] = dargs[arg]
 
     for arg in ['build_type', 'kernel_version']:
         if dargs.get(arg, False):
@@ -226,9 +229,11 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    print_args(args, __file__)
+
     config = fill_configs(args)
 
-    print(json.dumps(config, indent=4))
+    print_args(config, __file__, msg="Processed Config for")
 
     # Only check for kernel
     if args.checkonly:

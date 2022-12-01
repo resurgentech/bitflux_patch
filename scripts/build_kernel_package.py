@@ -26,11 +26,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    print("!----------------------------------------------------------------------------")
-    print("!-- Args into {}".format(__file__))
-    print("-----------------------------------------------------------------------------")
-    print(yaml.dump(vars(args)))
-    print("!----------------------------------------------------------------------------")
+    print_args(args, __file__)
 
     if args.build_type == 'file':
         if args.kernel_version is None:

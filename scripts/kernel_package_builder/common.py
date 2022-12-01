@@ -231,3 +231,15 @@ def read_yaml_file(filename):
         contents = file.read()
     output = yaml.load(contents, Loader=yaml.Loader)
     return output
+
+
+def print_args(oargs, filename, msg="Args into"):
+    if not isinstance(oargs, dict):
+        args = vars(oargs)
+    else:
+        args = oargs
+    print("!----------------------------------------------------------------------------")
+    print("!-- {} {}".format(msg, filename))
+    print("!----------------------------------------------------------------------------")
+    print(json.dumps(args, indent=4))
+    print("!----------------------------------------------------------------------------")

@@ -151,6 +151,13 @@ def setup_config(basedir, args):
         installer_options['grub_update'] = ''
     if args.installer_url is not None:
         installer_config["installer_url"] = args.installer_url
+    if args.tarballkernel is not None:
+        # extracting kernel version
+        _, out, _ = run_cmd("tar -tf {} | grep linux-image".format(args.tarballkernel))
+        if args.kernel_revision is None:
+            args.kernel_revision = out.split("_")[1]
+        if args.kernel_version is None:
+            args.kernel_version = args.kernel_revision.removesuffix("-1")
 
     return configs, installer_config, installer_options
 
@@ -466,6 +473,7 @@ if __name__ == '__main__':
     parser.add_argument('--installer_url', help='override installer url', type=str)
 
     args = parser.parse_args()
+    print_args(args, __file__)
 
     if args.vagrant_box is None or args.machine_name is None:
         print("need vagrant_box, machine_name")
@@ -474,7 +482,10 @@ if __name__ == '__main__':
 
     # default and configs
     configs, installer_config, installer_options = setup_config(basedir, args)
-    print(configs)
+    print_args(args, __file__, msg="Processed args for")
+    print_args(configs, __file__, msg="Processed config for")
+    print_args(installer_config, __file__, msg="'installer_config' for")
+    print_args(installer_options, __file__, msg="'installer_options' for")
 
     #DEPRECATED
     if args.collector_revision is not None:
