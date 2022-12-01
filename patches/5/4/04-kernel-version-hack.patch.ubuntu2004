@@ -1,0 +1,11 @@
+diff --git a/debian.master/d-i/kernel-versions b/debian.master/d-i/kernel-versions
+index 6cd90edd0..6be18004e 100644
+--- a/debian.master/d-i/kernel-versions
++++ b/debian.master/d-i/kernel-versions
+@@ -1,5 +1,5 @@
+ # arch	version		flavour		installedname			suffix	bdep
+-amd64	-		generic		-				-	-
++amd64	-		swaphints	-				-	-
+ 
+ i386	-		generic		-				-	-
+ 
