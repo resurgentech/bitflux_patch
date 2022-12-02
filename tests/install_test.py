@@ -157,7 +157,8 @@ def setup_config(basedir, args):
         if args.kernel_revision is None:
             args.kernel_revision = out.split("_")[1]
         if args.kernel_version is None:
-            args.kernel_version = args.kernel_revision.removesuffix("-1")
+            if args.kernel_revision.endswith("-1"):
+                args.kernel_version = args.kernel_revision[:-2]
 
     return configs, installer_config, installer_options
 
