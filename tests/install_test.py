@@ -153,7 +153,7 @@ def setup_config(basedir, args):
         installer_config["installer_url"] = args.installer_url
     if args.tarballkernel is not None:
         # extracting kernel version
-        _, out, _ = run_cmd("tar -tf {} | grep linux-image".format(args.tarballkernel))
+        _, out, _ = run_cmd("tar -tf latest.tar.gz | grep linux-image")
         if args.kernel_revision is None:
             args.kernel_revision = out.split("_")[1]
         if args.kernel_version is None:
@@ -168,11 +168,6 @@ def install_kernel(args, configs, installer_options, installer_config):
         installer_options['nokernel'] = ''
         installer_config['tarball'] = args.tarballkernel
         installer_config['kernel_version'] = args.kernel_version
-        # Getting tarball from either local fs or minio
-        if os.path.exists(args.tarballkernel):
-            shutil.copyfile(args.tarballkernel, 'latest.tar.gz')
-        else:
-            run_cmd("mc cp {} latest.tar.gz".format(args.tarballkernel))
         ansible_bitflux_install(configs, "install_tarballkernel.yml", args, installer_config, installer_options)
     elif args.pkgrepokernel is not None:
         # Runs script with ansible to install kernel
@@ -479,6 +474,13 @@ if __name__ == '__main__':
         print("need vagrant_box, machine_name")
         parser.print_help()
         sys.exit(1)
+
+    if args.tarballkernel is not None:
+        # Getting tarball from either local fs or minio
+        if os.path.exists(args.tarballkernel):
+            shutil.copyfile(args.tarballkernel, 'latest.tar.gz')
+        else:
+            run_cmd("mc cp {} latest.tar.gz".format(args.tarballkernel))
 
     # default and configs
     configs, installer_config, installer_options = setup_config(basedir, args)
