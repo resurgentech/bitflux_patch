@@ -292,7 +292,7 @@ static ssize_t swaphints_write(struct file *file, const char __user *ubuf,
 	 */
 	if (*ppos > 0 || count > swaphints_pfn_list.max) {
 		printk(KERN_INFO "Swaphints write hit too long");
-		printk(KERN_INFO "");
+		printk(KERN_INFO "*ppos=%llu count=%zu swaphints_pfn_list.max=%d",*ppos, count, swaphints_pfn_list.max);
 		return -EFAULT;
 	}
 
@@ -306,6 +306,7 @@ static ssize_t swaphints_write(struct file *file, const char __user *ubuf,
 		ret = -EFAULT;
 		goto write_exit;
 	}
+	ret = count;
 
 	/**
 	 * If we recieve swapnow we're just going to swap whats in the list
@@ -335,7 +336,6 @@ static ssize_t swaphints_write(struct file *file, const char __user *ubuf,
 		if (swaphints_pfn_list.index == (swaphints_pfn_list.max - 1))
 			swaphints_swapnow();
 	}
-	ret = strnlen(swaphints_pfn_list.buffer, write_buffer_size);
 	*ppos = ret;
 	memset((void *)swaphints_pfn_list.buffer, 0, write_buffer_size);
 write_exit:
