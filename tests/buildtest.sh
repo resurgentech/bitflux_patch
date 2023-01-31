@@ -148,24 +148,26 @@ then
              --build_type ${BUILD_TYPE} \
              ${PATCHONLY};
 
-  # Make tarball
-  cd output/;
-  rm -f ../latest.tar.gz;
-  rm -f a.tar.gz;
-  tar czf a.tar.gz *.deb;
-  cd ..;
 
-  BUILD_CHECK=$(cat output/swaphints_build_output.json | grep check | awk '{print $2}' | sed 's/,$//')
+  # Only run this if we are doing a real build, ie not a patch only build
+  if [ -z ${PATCHONLY} ]; then
+    # Make tarball
+    cd output/;
+    rm -f ../latest.tar.gz;
+    rm -f a.tar.gz;
+    tar czf a.tar.gz *.deb;
+    cd ..;
 
-  if [ ${BUILD_CHECK} != "0" ]; then
-    echo "BUILD_CHECK=${BUILD_CHECK}"
-    exit 1
+    BUILD_CHECK=$(cat output/swaphints_build_output.json | grep check | awk '{print $2}' | sed 's/,$//')
+
+    if [ ${BUILD_CHECK} != "0" ]; then
+      echo "BUILD_CHECK=${BUILD_CHECK}"
+      exit 1
+    fi
   fi
-
 fi
 
-if [ ! -z ${NO_TEST} ]
-then
+if [ ! -z ${NO_TEST} ]; then
   echo "${NO_TEST} - Exiting after build as requested"
   exit 1
 fi
