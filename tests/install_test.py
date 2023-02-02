@@ -467,6 +467,7 @@ if __name__ == '__main__':
     parser.add_argument('--kernel_revision', help='kernel package revision to confirm install', type=str)
     parser.add_argument('--kernel_version', help='kernel version to kernel is running, from uname', type=str)
     parser.add_argument('--installer_url', help='override installer url', type=str)
+    parser.add_argument('--zram', help='create swapfile backed zram instead of just swapfile', action='store_true')
 
     args = parser.parse_args()
     print_args(args, __file__)
@@ -525,8 +526,12 @@ if __name__ == '__main__':
     # Install bitflux packages
     install_bitflux(args, configs, installer_options, installer_config)
 
-    # Create swapfile if necessary
-    do_ansible(configs, "set_swapfile.yml", args)
+    if args.zram:
+        # Create zram
+        do_ansible(configs, "set_zramfile.yml", args)
+    else:
+        # Create swapfile if necessary
+        do_ansible(configs, "set_swapfile.yml", args)
 
     # Some modes don't autoload module
     if args.manual_modprobe:
