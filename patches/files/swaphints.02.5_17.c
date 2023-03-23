@@ -24,7 +24,7 @@
 
 
 MODULE_DESCRIPTION("Proc File Enabled Swap Hint Handler.");
-#define VERSION_NUMBER "0.64"
+#define VERSION_NUMBER "0.65"
 MODULE_VERSION(VERSION_NUMBER);
 #define PROCFS_NAME "swaphints"
 
@@ -34,6 +34,7 @@ MODULE_VERSION(VERSION_NUMBER);
  */
 #define ERR_SWAPHINTS_ISOLATE_LRU EINVAL
 #define ERR_SWAPHINTS_UNEVICTABLE EPERM
+#define ERR_SWAPHINTS_TAIL EPIPE
 
 /**
  * Structure to hold return values from reclaim_page()
