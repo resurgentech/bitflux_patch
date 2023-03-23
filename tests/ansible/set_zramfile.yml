@@ -30,10 +30,12 @@
       name: zram
       state: present
   - name: setup zram
-    command: |
-      echo /swapfile > /sys/block/zram0/backing_dev;
-      echo 4G > /sys/block/zram0/disksize;
-      echo 512M > /sys/block/zram0/mem_limit;
+    command:
+      cmd: |
+        echo /dev/vdb > /sys/block/zram0/backing_dev;
+        echo 512M > /sys/block/zram0/mem_limit;
+        echo 4G > /sys/block/zram0/disksize;
+
   - name: mkswap for swapfile
     command: mkswap /dev/zram0
     when: newswapfile is changed
