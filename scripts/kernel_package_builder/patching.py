@@ -85,22 +85,33 @@ def apply_patch_deprecated(path, src_dir, clean_patch, allow_errors=False, verbo
 
 def apply_patch(path, src_dir, clean_patch, allow_errors=False, verbose=False):
     print("\tPatching {}".format(path))
-    patch_cmd = "patch -p1 -F 100 -i {}".format(path)
+    # First try to apply the patch with dry-run to see if it will work
+    patch_cmd = "patch -p1 -i {} --dry-run".format(path)
     exitcode, stdout, stderr = run_cmd(patch_cmd, workingdir=src_dir, allow_errors=True, verbose=verbose)
+    if exitcode != 0 and not allow_errors:
+        print_run_cmd(patch_cmd, exitcode, stdout, stderr)
+        sys.stdout.flush()
+        sleep(1)
+        return False
+    # Now apply the patch, if dry-run worked
+    patch_cmd = "patch -p1 -i {}".format(path)
+    exitcode, _, _ = run_cmd(patch_cmd, workingdir=src_dir, allow_errors=True, verbose=verbose)
     # Clean up leftovers
     cmd = "find . | grep .orig$ | sed 's/^/rm /' | bash"
     run_cmd(cmd, workingdir=src_dir, allow_errors=True, verbose=verbose)
     cmd = "find . | grep .rej$ | sed 's/^/rm /' | bash"
     run_cmd(cmd, workingdir=src_dir, allow_errors=True, verbose=verbose)
+    # Really shouldn't fail here, given the testing above, but just in case
     if exitcode != 0 and not allow_errors:
         print_run_cmd(patch_cmd, exitcode, stdout, stderr)
         sys.stdout.flush()
         sleep(1)
-        raise
+        return False
     if clean_patch:
         commit_and_create_patch(path, src_dir, verbose=verbose)
     sys.stdout.flush()
     sleep(1)
+    return True
 
 
 def merge_c_file(path, src_dir, clean_patch, verbose=False):
@@ -204,12 +215,25 @@ def patch_copy_dirs(sorted_subfolders, src_dir, clean_patch, distro, allow_error
 
 def apply_patches(sorted_subfolders, src_dir, clean_patch, distro, allow_errors=False, verbose=False):
     """
-    Apply patches to sources
+    Apply patches to sources will try alternate patch if first fails
+       alternate patch is same name with a number as a final prefix appended
     """
     bucket = filter_dir(sorted_subfolders, src_dir, clean_patch, '.patch', distro, allow_errors=allow_errors, verbose=verbose)
     print("Appyling Patches:")
     for path in bucket:
-        apply_patch(path, src_dir, clean_patch, verbose=verbose)
+        failed = True
+        alternates = glob.glob('{}.[0-9]'.format(path))
+        if not apply_patch(path, src_dir, clean_patch, verbose=verbose):
+            for alt in alternates:
+                print("Trying alternate '{}'".format(alt))
+                if apply_patch(alt, src_dir, clean_patch, verbose=verbose):
+                    failed = False
+                    break
+        else:
+            failed = False
+        if failed:
+            print("Failed to apply patch or alternates '{}'".format(path))
+            raise
 
 
 def merge_c_files(sorted_subfolders, src_dir, clean_patch, distro, allow_errors=False, verbose=False):

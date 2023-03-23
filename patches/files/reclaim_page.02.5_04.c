@@ -10,6 +10,9 @@ extern unsigned long reclaim_page(struct page *page)
 	int retval;
 	LIST_HEAD(page_list);
 
+	if (PageTail(page))
+		return -EPIPE;
+
 	if (isolate_lru_page(page))
 		return -EINVAL;
 
