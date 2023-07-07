@@ -238,7 +238,7 @@ def check_packages(configs, args):
         'kerneltarball': {
             'debian': {
                 're': r'\S+\s+(\S+)\s+\S+\s+\[installed',
-                'cmd': "apt list linux-image-{} -a".format(re.sub('-1$', '', args.kernel_revision))
+                'cmd': "apt list linux-image-{} -a".format(re.sub('-1$', '', str(args.kernel_revision)))
             },
             'expected': None if args.tarballkernel is None else args.kernel_revision
         },
