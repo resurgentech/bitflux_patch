@@ -209,10 +209,14 @@ def deb_set_flavour(flavour, debian_dir, allow_errors=False, verbose=False):
     Generates flavour specific files for our new flavour
     '''
     file_pair = [
-        ['config/amd64/config.flavour.generic', 'config/amd64/config.flavour.{}'.format(flavour)],
         ['control.d/generic.inclusion-list', 'control.d/{}.inclusion-list'.format(flavour)],
         ['control.d/vars.generic', 'control.d/vars.{}'.format(flavour)]
     ]
+
+    # Hack for checking for old way of doing flavours
+    if os.path.isfile(os.path.join(debian_dir, 'config/amd64/config.flavour.generic')):
+        file_pair.append(['config/amd64/config.flavour.generic', 'config/amd64/config.flavour.{}'.format(flavour)])
+
     for a in file_pair:
         duplicate_file(a[0], a[1], workingdir=debian_dir, verbose=verbose)
     sed_sets = [
