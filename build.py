@@ -24,7 +24,11 @@ class KernelBuilder:
 
     def build(self):
         self.build_docker_image()
-        self.build_kernel_package()
+        try:
+            self.build_kernel_package()
+        except Exception as e:
+            print("ERROR: {}".format(e))
+            print(" build_kernel_package() failed")
         self.copy_output_from_container()
         self.cleanup()
         self.done()
