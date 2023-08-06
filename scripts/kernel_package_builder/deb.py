@@ -247,6 +247,8 @@ def build_debs_hack(src_dir, allow_errors=False, verbose=False, live_output=True
 
     :param path: path with kernel sources to build
     """
+    printfancy("HACK", timeout=3)
+
     printfancy("debian clean", timeout=3)
     run_cmd("LANG=C fakeroot debian/rules clean", workingdir=src_dir, allow_errors=allow_errors, verbose=verbose, live_output=live_output)
 
@@ -258,7 +260,7 @@ def build_debs_hack(src_dir, allow_errors=False, verbose=False, live_output=True
     run_cmd(cmd, workingdir=src_dir, allow_errors=allow_errors, verbose=verbose, live_output=live_output, no_stdout=True)
 
     printfancy("HACK: cp vmlinux")
-    cmd = "cp tools/bpf/bpftool/vmlinux debian/build/tools-perarch/tools/bpf/bpftool/"
+    cmd = "mkdir -p debian/build/tools-perarch/tools/bpf/bpftool; cp tools/bpf/bpftool/vmlinux debian/build/tools-perarch/tools/bpf/bpftool/"
     run_cmd(cmd, workingdir=src_dir, allow_errors=allow_errors, verbose=verbose, live_output=live_output, no_stdout=True)
 
     printfancy("debian binary")
