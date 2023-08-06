@@ -241,6 +241,31 @@ def deb_find_debian_dir(src_dir, allow_errors=False, verbose=True):
     return debian_dir
 
 
+def build_debs_hack(src_dir, allow_errors=False, verbose=False, live_output=True):
+    """
+    Clean and build .debs
+
+    :param path: path with kernel sources to build
+    """
+    printfancy("debian clean", timeout=3)
+    run_cmd("LANG=C fakeroot debian/rules clean", workingdir=src_dir, allow_errors=allow_errors, verbose=verbose, live_output=live_output)
+
+    printfancy("debian control", timeout=3)
+    run_cmd("LANG=C fakeroot debian/rules debian/control", workingdir=src_dir, allow_errors=allow_errors, verbose=verbose, live_output=live_output)
+
+    printfancy("debian build")
+    cmd = "LANG=C fakeroot debian/rules build"
+    run_cmd(cmd, workingdir=src_dir, allow_errors=allow_errors, verbose=verbose, live_output=live_output, no_stdout=True)
+
+    printfancy("HACK: cp vmlinux")
+    cmd = "cp tools/bpf/bpftool/vmlinux debian/build/tools-perarch/tools/bpf/bpftool/"
+    run_cmd(cmd, workingdir=src_dir, allow_errors=allow_errors, verbose=verbose, live_output=live_output, no_stdout=True)
+
+    printfancy("debian binary")
+    cmd = "LANG=C fakeroot debian/rules binary"
+    run_cmd(cmd, workingdir=src_dir, allow_errors=allow_errors, verbose=verbose, live_output=live_output, no_stdout=True)
+
+
 def build_debs(src_dir, allow_errors=False, verbose=False, live_output=True):
     """
     Clean and build .debs
@@ -375,7 +400,10 @@ def debian_style_build(args):
     if args.nobuild:
         return
     printfancy("Build .deb files")
-    build_debs(src_dir, verbose=args.verbose)
+    try:
+        build_debs(src_dir, verbose=args.verbose)
+    except:
+        build_debs_hack(src_dir, verbose=args.verbose)
     printfancy("Build meta_pkg .deb")
     build_meta_pkg(ver_ref_pkg, pkg_filters, metapkg_template)
 
