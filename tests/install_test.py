@@ -179,7 +179,6 @@ def install_kernel(args, configs, installer_options, installer_config):
 
 
 def install_bitflux(args, configs, installer_options, installer_config):
-    installer_options[''] = ''
     if args.pkgrepo is not None:
         installer_options['overrides']['apt_repo_url'] = args.pkgrepo
         installer_options['overrides']['yum_repo_baseurl'] = args.pkgrepo
