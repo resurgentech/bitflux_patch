@@ -156,9 +156,6 @@ def setup_config(basedir, args):
         _, out, _ = run_cmd("tar -tf latest.tar.gz | grep linux-image")
         if args.kernel_revision is None:
             args.kernel_revision = out.split("_")[1]
-        if args.kernel_version is None:
-            if args.kernel_revision.endswith("-1"):
-                args.kernel_version = args.kernel_revision[:-2]
 
     return configs, installer_config, installer_options
 
@@ -182,6 +179,7 @@ def install_kernel(args, configs, installer_options, installer_config):
 
 
 def install_bitflux(args, configs, installer_options, installer_config):
+    installer_options[''] = ''
     if args.pkgrepo is not None:
         installer_options['overrides']['apt_repo_url'] = args.pkgrepo
         installer_options['overrides']['yum_repo_baseurl'] = args.pkgrepo
@@ -238,7 +236,7 @@ def check_packages(configs, args):
         'kerneltarball': {
             'debian': {
                 're': r'\S+\s+(\S+)\s+\S+\s+\[installed',
-                'cmd': "apt list linux-image-{} -a".format(re.sub('-1$', '', str(args.kernel_revision)))
+                'cmd': "apt list | grep {}".format(re.sub('-1$', '', str(args.kernel_revision)))
             },
             'expected': None if args.tarballkernel is None else args.kernel_revision
         },
@@ -260,15 +258,15 @@ def check_packages(configs, args):
         'bitflux': {
             'redhat': {
                 're': r'\S+\s+([0-9\.\-]+)',
-                'cmd': "dnf list installed bitflux"
+                'cmd': "dnf list installed bitfluxd"
             },
             'amazon': {
                 're': r'\S+\s+([0-9\.\-]+)',
-                'cmd': "yum list installed bitflux"
+                'cmd': "yum list installed bitfluxd"
             },
             'debian': {
                 're': r'\S+\s+([0-9\.\-]+)+\s+\S+\s+\[installed',
-                'cmd': "apt list bitflux -a"
+                'cmd': "apt list bitfluxd -a"
             },
             'expected': args.bitflux_revision
         }
@@ -355,7 +353,7 @@ def check_for_memhog(configs, args):
 
 
 def memhog(configs, args):
-    exitcode, out, err = do_ansible_adhoc(configs, args, "nohup memhog --size 1G --test 6 --waitTime 1 &")
+    exitcode, out, err = do_ansible_adhoc(configs, args, "bash -c \"nohup memhog --size 1G --test 6 --waitTime 1 &> /dev/null &\"")
     if exitcode != 0:
         print("exitcode: {}".format(exitcode))
         print("stdout: '{}'".format(out))
