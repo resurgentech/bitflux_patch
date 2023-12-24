@@ -19,6 +19,7 @@ if __name__ == '__main__':
     parser.add_argument('--metapkg_template', help='For .deb, what to call new package', default='linux-image-swaphints', type=str)
 
     parser.add_argument('--nobuild', help='Don\'t build', action='store_true')
+    parser.add_argument('--rebuild', help='Rebuild prepared directory, for manual hacking kernel', action='store_true')
     parser.add_argument('--clean', help='Extra clean up steps', action='store_true')
     parser.add_argument('--verbose', help='verbose', action='store_true')
     parser.add_argument('--git_ref_urls_path', help='Requires path to git mirror.', default='/opt/mirrors/linux-stable.git', type=str)

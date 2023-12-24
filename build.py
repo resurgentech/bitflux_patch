@@ -179,7 +179,7 @@ def fill_configs(args):
             if not config['settings'].get(arg, False):
                 config['settings'][arg] = dargs[arg]
 
-    for arg in ['clean', 'nobuild','buildnumber']:
+    for arg in ['clean', 'nobuild', 'buildnumber', 'rebuild']:
         if dargs.get(arg, False):
             config['settings'][arg] = dargs[arg]
 
@@ -229,6 +229,7 @@ if __name__ == '__main__':
     parser.add_argument('--dumpall', help='Dump everything from the container - DEBUG', action='store_true')
     parser.add_argument('--nopull', help="Use local docker images, don't pull - DEBUG", action='store_true')
     parser.add_argument('--nobuild', help="Don't build - DEBUG", action='store_true')
+    parser.add_argument('--rebuild', help='Rebuild kernel, skips preparing - DEBUG', action='store_true')
     parser.add_argument('--clean', help='Extra clean up steps - DEBUG', action='store_true')
 
     args = parser.parse_args()

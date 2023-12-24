@@ -9,8 +9,9 @@
       dest: /tmp/latest.tar.gz
   - name: Untar kernel
     shell: mkdir /tmp/latest; cd /tmp/latest/; tar xvf /tmp/latest.tar.gz
-    args:
-      warn: false
+    #args:
+    #  warn: false
+    # this is failing now not sure why?
   - name: Install kernel
     shell: cd /tmp/latest/; apt install -y $(ls *.deb | sed 's/^/.\//')
   - name: Autoload Kernel

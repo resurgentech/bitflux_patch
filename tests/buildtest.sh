@@ -28,6 +28,10 @@ for i in "$@"; do
       SMALLBUILD="SMALLBUILD"
       shift
       ;;
+    --dryrun)
+      DRYRUN="DRYRUN"
+      shift
+      ;;
     # OVERRIDE = distro to pass to build and test scripts
     --distro=*)
       DISTRO="${i#*=}"
@@ -140,13 +144,18 @@ sleep 2
 
 if [ -z ${SKIPBUILD} ]
 then
-
+  cmd="\
   ./build.py --buildnumber 0 \
              --kernel_version ${ACTUAL_KERNEL_VERSION} \
              --docker_image ${DOCKER_IMAGE} \
              --distro ${DISTRO} \
              --build_type ${BUILD_TYPE} \
-             ${PATCHONLY};
+             ${PATCHONLY};"
+  echo $cmd
+  echo ""
+  if [ -z ${DRYRUN} ]; then
+    eval $cmd
+  fi
 
 
   # Only run this if we are doing a real build, ie not a patch only build
@@ -172,7 +181,7 @@ if [ ! -z ${NO_TEST} ]; then
   exit 1
 fi
 
-
+cmd=" \
 ./tests/install_test.py --vagrant_box ${VAGRANTBOX} \
                         --machine_name manualtest \
                         --license ${BITFLUX_API_TOKEN} \
@@ -181,5 +190,10 @@ fi
                         --kernel_revision ${KERNEL_VERSION}-custom-1 \
                         --kernel_version ${KERNEL_VERSION}-custom \
                         --tarballkernel output/a.tar.gz \
-                        ${NOTEARDOWN};
+                        ${NOTEARDOWN};"
+echo $cmd
+echo ""
+if [ -z ${DRYRUN} ]; then
+  eval $cmd
+fi
 exit $?

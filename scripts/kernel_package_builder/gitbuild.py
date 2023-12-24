@@ -4,19 +4,20 @@ from .common import *
 from .patching import *
 
 
-def git_checkout_kernel(build_dir, kernel_branch, giturl, git_ref_urls_path):
+def git_checkout_kernel(build_dir, kernel_branch, giturl, git_ref_urls_path, rebuild):
     branch_filepath = os.path.join(build_dir, kernel_branch)
     filepath = os.path.join(build_dir, kernel_branch)
-    run_cmd("rm -rf {}".format(branch_filepath), verbose=False)
-    sys.stdout.flush()
-    run_cmd("mkdir -p {}".format(build_dir), verbose=False)
-    print("Checkout branch '{}' from '{}'".format(kernel_branch, git_ref_urls_path))
-    run_cmd("git clone {} --reference-if-able {} {}".format(giturl, git_ref_urls_path, branch_filepath), verbose=False)
-    run_cmd("git fetch --all", workingdir=filepath, verbose=False)
-    if kernel_branch =='master' or re.match(r'y$', kernel_branch):
-        run_cmd("git checkout origin/{}".format(kernel_branch), workingdir=filepath, verbose=False)
-    else:
-        run_cmd("git checkout {}".format(kernel_branch), workingdir=filepath, verbose=False)
+    if not rebuild:
+        run_cmd("rm -rf {}".format(branch_filepath), verbose=False)
+        sys.stdout.flush()
+        run_cmd("mkdir -p {}".format(build_dir), verbose=False)
+        print("Checkout branch '{}' from '{}'".format(kernel_branch, git_ref_urls_path))
+        run_cmd("git clone {} --reference-if-able {} {}".format(giturl, git_ref_urls_path, branch_filepath), verbose=False)
+        run_cmd("git fetch --all", workingdir=filepath, verbose=False)
+        if kernel_branch =='master' or re.match(r'y$', kernel_branch):
+            run_cmd("git checkout origin/{}".format(kernel_branch), workingdir=filepath, verbose=False)
+        else:
+            run_cmd("git checkout {}".format(kernel_branch), workingdir=filepath, verbose=False)
     if kernel_branch == "master":
         _, output, _ = run_cmd("cd {}; git tag -l | sort --version-sort".format(filepath), verbose=False)
         output = output.splitlines()
@@ -91,7 +92,7 @@ def test_git_build(args):
     kernel_version = args.kernel_version
     build_dir = "./build"
 
-    kernel_version, src_dir = git_checkout_kernel(build_dir, kernel_version, args.giturl, args.git_ref_urls_path)
+    kernel_version, src_dir = git_checkout_kernel(build_dir, kernel_version, args.giturl, args.git_ref_urls_path, args.rebuild)
 
     # Match up the patch directory
     patches_dir = select_patches_dir(kernel_version, verbose=args.verbose)
@@ -100,16 +101,16 @@ def test_git_build(args):
     if patches_dir is None:
         raise
 
-    # Go ahead and do patching of kernel sources
-    init_commit = patch_in("gitbuild", patches_dir, src_dir, verbose=args.verbose, clean_patch=True)
+    if not args.rebuild:
+        # Go ahead and do patching of kernel sources
+        init_commit = patch_in("gitbuild", patches_dir, src_dir, verbose=args.verbose, clean_patch=True)
 
-    if init_commit is not None:
-        filepath = os.path.join(patches_dir, "complete.patch")
-        commit_and_create_patch(filepath, src_dir, commit_hash=init_commit, verbose=args.verbose)
-    print("Patching Complete")
+        if init_commit is not None:
+            filepath = os.path.join(patches_dir, "complete.patch")
+            commit_and_create_patch(filepath, src_dir, commit_hash=init_commit, verbose=args.verbose)
+        print("Patching Complete")
     sys.stdout.flush()
     sleep(3)
-
 
     # Run kernel build
     if args.nobuild:
