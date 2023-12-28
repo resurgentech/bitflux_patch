@@ -335,6 +335,12 @@ def check_for_bitflux(configs, args):
         print("stdout: '{}'".format(out))
         print("stderr: '{}'".format(err))
         sys.stdout.flush()
+        cmd = "sudo journalctl -u bitflux"
+        exitcode, out, err = do_ansible_adhoc(configs, args, cmd)
+        print("exitcode: {}".format(exitcode))
+        print("stdout: '{}'".format(out))
+        print("stderr: '{}'".format(err))
+        sys.stdout.flush()
         return 1
     return 0
 
