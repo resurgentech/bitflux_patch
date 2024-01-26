@@ -77,12 +77,20 @@ def apt_get_linux_image_name(search_pkg, allow_errors=False, verbose=False):
     # sort list on sorthelper key
     sorted_image_list = sorted(image_list, key=debsrc_list_srt_func)
     fullimage = sorted_image_list[-1]
+    print("found image '{}'".format(fullimage))
 
     if isinstance(fullimage["Depends"], list):
         rawversion = fullimage["Depends"][0]
     else:
         rawversion = fullimage["Depends"]
-    image = rawversion.split(" ")[0]
+    if rawversion.find("linux-image") == -1:
+        print("did not find linux-image in '{}'".format(rawversion))
+        return fullimage['Package']
+
+    if rawversion.find("("):
+        image = rawversion.replace(" ", "").replace("(", "").replace(")", "")
+    else:
+        image = rawversion.split(" ")[0]
     return image
 
 
@@ -92,7 +100,7 @@ def apt_get_source(image_name, allow_errors=False, verbose=False, builddir='./bu
     """
     run_cmd("mkdir -p {}".format(builddir), allow_errors=allow_errors, verbose=verbose)
     cmd = "fakeroot apt-get source {}".format(image_name)
-    run_cmd(cmd, workingdir=builddir, allow_errors=allow_errors, verbose=verbose)
+    run_cmd(cmd, workingdir=builddir, allow_errors=allow_errors, verbose=True)
     # preceding command should leave a directory containing actual patched source
     path = find_directory(searchdir=builddir)
     if path is None:
@@ -374,7 +382,8 @@ def debian_style_build(args):
         raise
 
     # Download source code and return where the kernel source code is located
-    src_dir = apt_get_source('linux', verbose=args.verbose)
+    #src_dir = apt_get_source('linux', verbose=args.verbose)
+    src_dir = apt_get_source(image_name, verbose=args.verbose)
     printfancy("Found kernel src directory: {}".format(src_dir))
 
     debian_dir = deb_find_debian_dir(src_dir)
