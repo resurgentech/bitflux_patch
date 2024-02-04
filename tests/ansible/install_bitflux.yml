@@ -7,17 +7,13 @@
       url: "{{ installer_url }}"
       dest: "/tmp/{{ installer_filename }}"
       mode: '0777'
+  - name: Remove all machine-id
+    shell: rm -f /etc/machine-id
+    ignore_errors: true
+  - name: Generate new machine-id
+    shell: dbus-uuidgen --ensure=/etc/machine-id
+    ignore_errors: true
   - name: Install
     shell: "/tmp/{{ installer_filename }} {{ installer_options }}"
-  - name: Reboot the server
-    shell: "reboot"
-    async: 1
-    poll: 0
-  - name: Wait for the reboot and reconnect
-    wait_for:
-      port: 22
-      host: '{{ (ansible_ssh_host|default(ansible_host))|default(inventory_hostname) }}'
-      search_regex: OpenSSH
-      delay: 10
-      timeout: 90
-    connection: local
+  - name: reboot
+    reboot:

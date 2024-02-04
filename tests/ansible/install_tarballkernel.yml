@@ -9,21 +9,19 @@
       dest: /tmp/latest.tar.gz
   - name: Untar kernel
     shell: mkdir /tmp/latest; cd /tmp/latest/; tar xvf /tmp/latest.tar.gz
-    args:
-      warn: false
+    #args:
+    #  warn: false
+    # this is failing now not sure why?
   - name: Install kernel
-    shell: cd /tmp/latest/; apt install $(ls *.deb | sed 's/^/.\//')
+    shell: cd /tmp/latest/; apt install -y $(ls *.deb | sed 's/^/.\//')
   - name: Autoload Kernel
     shell: echo \"swaphints\" >> /etc/modules-load.d/swaphints.conf
-  - name: Reboot the server
-    shell: "reboot"
-    async: 1
-    poll: 0
-  - name: Wait for the reboot and reconnect
-    wait_for:
-      port: 22
-      host: '{{ (ansible_ssh_host|default(ansible_host))|default(inventory_hostname) }}'
-      search_regex: OpenSSH
-      delay: 10
-      timeout: 90
-    connection: local
+  - name: Download installer
+    get_url:
+      url: "{{ installer_url }}"
+      dest: "/tmp/{{ installer_filename }}"
+      mode: '0777'
+  - name: Modify Grub
+    shell: "/tmp/{{ installer_filename }} --nokernel --nobitflux --grub_update"
+  - name: reboot
+    reboot:

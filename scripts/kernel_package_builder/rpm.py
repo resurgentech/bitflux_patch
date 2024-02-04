@@ -11,7 +11,7 @@ def dnf_update_upgrade(allow_errors=False, verbose=False, live_output=False):
     """
     Update and upgrade rpm repos to latest
     """
-    run_cmd("dnf update -y --enableupdate=elrepo-kernel", allow_errors=allow_errors, verbose=verbose, live_output=live_output)
+    run_cmd("dnf update -y", allow_errors=allow_errors, verbose=verbose, live_output=live_output)
 
 
 def dnf_get_srpm(kernel_version, distro, allow_errors=False, verbose=True, builddir='./build'):
@@ -134,6 +134,7 @@ def rpm_upack_srpm(srpm_filename, allow_errors=False, verbose=False, builddir='.
 
 def dnf_hack_elrepo_specfile(bitflux_version, pkg_release, patchfile_path, rpm_topdir, allow_errors=False, verbose=False):
     specfile = find_file(searchdir="{}/SPECS".format(rpm_topdir), matchfile=".spec$")
+    shutil.copyfile(specfile, "{}.orig".format(specfile))
     print("specfile = {}".format(specfile))
     shutil.copyfile(patchfile_path, "{}/SOURCES/demandswapping.patch".format(rpm_topdir))
     cmd = "sed -i '/buildid .local/a %define buildid .{}' {}".format(bitflux_version, specfile)
@@ -149,15 +150,36 @@ def dnf_hack_elrepo_specfile(bitflux_version, pkg_release, patchfile_path, rpm_t
     return specfile
 
 def dnf_hack_srpm_specfile(bitflux_version, pkg_release, patchfile_path, rpm_topdir, allow_errors=False, verbose=False):
-    specfile = find_file(searchdir="{}/SPECS".format(rpm_topdir), matchfile=".spec$")
+    origspecfile = find_file(searchdir="{}/SPECS".format(rpm_topdir), matchfile=".spec$")
+    # Save off copy of original spec file as  *.spec.orig
+    shutil.copyfile(origspecfile, "{}.orig".format(origspecfile))
+    # Rename spec file
+    specfile = "{}-swaphints.spec".format(origspecfile.split('.spec')[0])
+    shutil.copyfile(origspecfile, specfile)
     print("specfile = {}".format(specfile))
+    # generate_all_configs.sh edit
+    cmd = "sed -i 's/-f2-/-f3-/' {}/SOURCES/generate_all_configs.sh".format(rpm_topdir)
+    run_cmd(cmd, allow_errors=allow_errors, verbose=verbose)
+    # Copy patch into build dir
     shutil.copyfile(patchfile_path, "{}/SOURCES/demandswapping.patch".format(rpm_topdir))
+    # Rename config templates
+    configtemplates = glob.glob('{}/SOURCES/kernel-*.config'.format(rpm_topdir))
+    for cname in configtemplates:
+        newcname = "{}/SOURCES/kernel-swaphints-{}".format(rpm_topdir, cname.split('kernel-')[1])
+        shutil.copyfile(cname, newcname)
+    # Call this kernel-swaphints instead of kernel
+    cmd = "sed -i 's/kernel%{{?variant}}/kernel-swaphints%{{?variant}}/' {}".format(specfile)
+    run_cmd(cmd, allow_errors=allow_errors, verbose=verbose)
+    # Set bitflux version
     cmd = "sed -i '/buildid .local/a %define buildid .{}' {}".format(bitflux_version, specfile)
     run_cmd(cmd, allow_errors=allow_errors, verbose=verbose)
+    # pkg_release NOTE: doesn't seem to do much
     cmd = "sed -i 's/%define pkg_release [[:digit:]]\+%/%define pkg_release {}%/' {}".format(pkg_release, specfile)
     run_cmd(cmd, allow_errors=allow_errors, verbose=verbose)
+    # Delete NoSource... if there.
     cmd = "sed -i '/NoSource: 0/d' {}".format(specfile)
     run_cmd(cmd, allow_errors=allow_errors, verbose=verbose)
+    # Splice patch into specfile
     cmd = "sed -i '/Patches./a Patch8000: demandswapping.patch' {}".format(specfile)
     run_cmd(cmd, allow_errors=allow_errors, verbose=verbose)
     cmd = "sed -i '/# END OF PATCH APPLICATIONS/i ApplyOptionalPatch demandswapping.patch' {}".format(specfile)
@@ -206,13 +228,13 @@ def rpm_style_build(args):
     sys.stdout.flush()
     sleep(2)
 
-    bitflux_version = get_bitflux_version()
-    print("Set bitflux_version:        {}".format(bitflux_version))
+    pkg_release = args.buildnumber
+    print("Set pkg_release:        {}".format(pkg_release))
     sys.stdout.flush()
     sleep(2)
 
-    pkg_release = args.buildnumber
-    print("Set pkg_release:        {}".format(pkg_release))
+    bitflux_version = get_bitflux_version(buildnum=pkg_release)
+    print("Set bitflux_version:        {}".format(bitflux_version))
     sys.stdout.flush()
     sleep(2)
 

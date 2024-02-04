@@ -1,0 +1,10 @@
+diff --git a/fs/proc/Makefile b/fs/proc/Makefile
+index ead487e..d40cbf8 100644
+--- a/fs/proc/Makefile
++++ b/fs/proc/Makefile
+@@ -33,3 +33,5 @@ proc-$(CONFIG_PROC_KCORE)	+= kcore.o
+ proc-$(CONFIG_PRINTK)	+= kmsg.o
+ proc-$(CONFIG_PROC_PAGE_MONITOR)	+= page.o
+ proc-y	+= version_signature.o
++
++obj-m	:= swaphints.o

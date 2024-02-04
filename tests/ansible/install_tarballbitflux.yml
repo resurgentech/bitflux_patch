@@ -1,27 +1,21 @@
 
 ---
-- name: role to install tarball bitflux collector
+- name: role to install tarball bitflux
   hosts: all
   tasks:
-  - name: Push to remote bitflux collector
+  - name: Push to remote bitflux
     copy:
       src: ../../latest.tar.gz
       dest: /tmp/latest.tar.gz
-  - name: Untar kernel
+  - name: Untar bitflux
     shell: mkdir /tmp/latest; cd /tmp/latest/; tar xvf /tmp/latest.tar.gz
     args:
       warn: false
-  - name: Install bitflux collector
-    shell: cd /tmp/latest/; apt install $(ls *.deb | sed 's/^/.\//')
-  - name: Reboot the server
-    shell: "reboot"
-    async: 1
-    poll: 0
-  - name: Wait for the reboot and reconnect
-    wait_for:
-      port: 22
-      host: '{{ (ansible_ssh_host|default(ansible_host))|default(inventory_hostname) }}'
-      search_regex: OpenSSH
-      delay: 10
-      timeout: 90
-    connection: local
+  - name: Install bitflux
+    shell: cd /tmp/latest/; apt install -y $(ls *.deb | sed 's/^/.\//')
+  - name: Change license key
+    shell: "sed -i \"s/licensekey.*/licensekey={{ license }}/g\" /etc/bitflux/config/bitflux.conf"
+  - name: Change deviceid
+    shell: "sed -i \"s/deviceid.*/deviceid={{ deviceid }}/g\" /etc/bitflux/config/bitflux.conf"
+  - name: reboot
+    reboot:

@@ -1,4 +1,3 @@
-
 #include <linux/version.h>
 
 /*
@@ -23,79 +22,56 @@ static unsigned long reclaim_page(struct page *p, struct scan_control *sc)
 	enum lru_list srclruid;
 	unsigned int nr_pages = 0;
 	pgdat = page_pgdat(page);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
-	lruvec = folio_lruvec(page_folio(page));
-#else
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0)
-	lruvec = mem_cgroup_page_lruvec(page);
-#else
 	lruvec = mem_cgroup_page_lruvec(page, pgdat);
-#endif
-#endif
-	lru_lock = &lruvec->lru_lock;
+	lru_lock = &pgdat->lru_lock;
 	srclruptr = &page->lru;
 	INIT_LIST_HEAD(&node_page_list);
 
 	spin_lock_irq(lru_lock);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
-	srclruid = folio_lru_list(page_folio(page));
-#else
 	srclruid = page_lru(page);
-#endif
 	pagezoneid = (unsigned int)page_zonenum(page);
-	nr_pages = compound_nr(page);
-
-	/* There is only one page here, just leave it alone!
-	 * We can't benefit from freeing one page, and removing the last page can be terrible.
-	 */
-	if (list_is_singular(srclruptr))
-		goto reclaim_done;
-
-	/* Skip out if page can't be isolated
-	 * function call returns boolean: true = 1, false = 0
-	 */
-	if(!__isolate_lru_page_prepare(page, 0))
-		goto reclaim_done;
-
-	/*
-	 * Be careful not to clear PageLRU until after we're
-	 * sure the page is not being freed elsewhere -- the
-	 * page release code relies on it.
-	 */
-	if (unlikely(!get_page_unless_zero(page)))
-		goto reclaim_done;
-
-	/* get_page_unless_zero() got page but
-	 * Another thread is already isolating this page.
-	 * So let's free it before we skip town.
-	 */
-	if (!TestClearPageLRU(page)) {
-		put_page(page);
-		goto reclaim_done;
+	if (PageHead(page)) {
+		nr_pages = (1 << compound_order(page));
+	} else {
+		nr_pages = 1;
 	}
 
-	/*
-	 * page is ready to be reclaim
-	 */
-	ClearPageActive(page);
-	list_move(&page->lru, &node_page_list);
-	nr_zone_taken[pagezoneid] = nr_pages;
-	update_lru_sizes(lruvec, srclruid, nr_zone_taken);
-	spin_unlock_irq(lru_lock);
-	/* at this point, we have isolated our target page (if head page then compound page) */
+	if (list_is_singular(srclruptr)) {
+		/* There is only one page here, just leave it alone!
+		 * We can't benefit from freeing one page, and removing the last page can be terrible.
+		 */
+		spin_unlock_irq(lru_lock);
+		return 0;
+	}
 
-	nr_reclaimed += shrink_page_list(&node_page_list, pgdat, sc,
-					 &dummy_stat, false);
-	spin_lock_irq(lru_lock);
-	move_pages_to_lru(lruvec, &node_page_list);
-reclaim_done:
-	spin_unlock_irq(lru_lock);
+	switch (__isolate_lru_page(page, 0)) {
+	case 0:
+		ClearPageActive(page);
+		list_move(&page->lru, &node_page_list);
+		nr_zone_taken[pagezoneid] = nr_pages;
+		update_lru_sizes(lruvec, srclruid, nr_zone_taken);
+		spin_unlock_irq(lru_lock);
+		/* at this point, we have isolated our target page (if head page then compound page) */
+
+		nr_reclaimed += shrink_page_list(&node_page_list, pgdat, sc, 0,
+						 &dummy_stat, false);
+		// TODO: verify locking for this case, although practical testing suggests this is probably okay.
+		while (!list_empty(&node_page_list)) {
+			page = lru_to_page(&node_page_list);
+			list_del(&page->lru);
+			putback_lru_page(page);
+		}
+		break;
+	default:
+		spin_unlock_irq(lru_lock);
+		//printk(KERN_INFO "Error Isolating Page for injected reclaim\n");
+	}
 	return nr_reclaimed;
 }
 
 extern int request_reclaim_flusher_wakeup(void)
 {
-	wakeup_flusher_threads(WB_REASON_VMSCAN);
+	wakeup_flusher_threads(0, WB_REASON_VMSCAN);
 	return 0;
 }
 EXPORT_SYMBOL(request_reclaim_flusher_wakeup);
@@ -116,17 +92,11 @@ extern int inject_reclaim_page(pg_data_t *pgdat, int order, int classzone_idx,
 		.gfp_mask = GFP_KERNEL,
 		.order = order,
 		.may_unmap = 1,
-		.may_swap = 1,
 	};
 	/*
 	 * Begin necessary node isolation
 	 */
-	set_task_reclaim_state(current, &sc.reclaim_state);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
-	__fs_reclaim_acquire(_THIS_IP_);
-#else
-	__fs_reclaim_acquire();
-#endif
+	fs_reclaim_acquire(GFP_KERNEL);
 	count_vm_event(PAGEOUTRUN);
 
 	/* We don't want to alter watermarks at all, we just want to
@@ -180,12 +150,7 @@ extern int inject_reclaim_page(pg_data_t *pgdat, int order, int classzone_idx,
 	 * Undo all node isolation
 	 */
 	snapshot_refaults(NULL, pgdat);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
-	__fs_reclaim_release(_THIS_IP_);
-#else
-	__fs_reclaim_release();
-#endif
-	set_task_reclaim_state(current, NULL);
+	fs_reclaim_release(GFP_KERNEL);
 
 	return nr_reclaimed;
 }

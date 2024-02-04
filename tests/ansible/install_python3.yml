@@ -1,5 +1,5 @@
 ---
-- name: role to install bitflux
+- name: role to install python
   hosts: all
   tasks:
   - name: TEMP - ensure python is installed

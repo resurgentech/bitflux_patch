@@ -3,3 +3,9 @@
 __pycache__
 /artifactory.json
 /output
+/machines
+machines.yaml
+package.yaml
+config.yaml
+latest.tar.gz
+README.html

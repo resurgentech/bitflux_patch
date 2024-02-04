@@ -1,0 +1,49 @@
+---
+- name: role to create and setup zram swap
+  hosts: all
+  tasks:
+  - name: Create swapfile
+    command:
+      cmd: dd if=/dev/zero of=/swapfile bs=1M count=2048
+      creates: /swapfile
+    register: newswapfile
+  - name: Set permissions for swapfile.
+    file:
+      path: /swapfile
+      owner: root
+      group: root
+      mode: 0600
+    when: newswapfile is changed
+  - name: swapoff /swapfile
+    command: swapoff /swapfile
+    when: newswapfile is changed
+    ignore_errors: yes
+  - name: swapoff /dev/zram0
+    command: swapoff /dev/zram0
+    ignore_errors: yes
+  - name: remove zram
+    modprobe:
+      name: zram
+      state: absent
+  - name: start zram
+    modprobe:
+      name: zram
+      state: present
+  - name: setup zram
+    command:
+      cmd: |
+        echo /dev/vdb > /sys/block/zram0/backing_dev;
+        echo 512M > /sys/block/zram0/mem_limit;
+        echo 4G > /sys/block/zram0/disksize;
+
+  - name: mkswap for swapfile
+    command: mkswap /dev/zram0
+    when: newswapfile is changed
+  - name: swapon
+    command: swapon /dev/zram0
+    when: newswapfile is changed
+  - name: Set swappiness
+    sysctl:
+      name: vm.swappiness
+      value: "1"
+      state: present

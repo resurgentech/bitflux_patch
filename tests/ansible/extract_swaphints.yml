@@ -1,0 +1,9 @@
+---
+- name: role to pull /proc/swaphints
+  hosts: all
+  tasks:
+  - name: read /proc/swaphints
+    fetch:
+      src: /proc/swaphints
+      dest: /tmp/swaphints-{{ inventory_hostname }}.bin
+    ignore_errors: true
