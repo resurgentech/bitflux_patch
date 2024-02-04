@@ -219,7 +219,6 @@ def apply_patches(sorted_subfolders, src_dir, clean_patch, distro, allow_errors=
        alternate patch is same name with a number as a final prefix appended
     """
     bucket = filter_dir(sorted_subfolders, src_dir, clean_patch, '.patch', distro, allow_errors=allow_errors, verbose=verbose)
-    print(f"bucket: {bucket}")
     print("Appyling Patches:")
     for path in bucket:
         failed = True

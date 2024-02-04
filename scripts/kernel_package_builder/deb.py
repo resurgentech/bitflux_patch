@@ -100,7 +100,7 @@ def apt_get_source(image_name, allow_errors=False, verbose=False, builddir='./bu
     """
     run_cmd("mkdir -p {}".format(builddir), allow_errors=allow_errors, verbose=verbose)
     cmd = "fakeroot apt-get source {}".format(image_name)
-    run_cmd(cmd, workingdir=builddir, allow_errors=allow_errors, verbose=True)
+    run_cmd(cmd, workingdir=builddir, allow_errors=allow_errors, verbose=verbose)
     # preceding command should leave a directory containing actual patched source
     path = find_directory(searchdir=builddir)
     if path is None:
