@@ -3,6 +3,7 @@
 __pycache__
 /artifactory.json
 /output
+/dumpall
 /machines
 machines.yaml
 package.yaml

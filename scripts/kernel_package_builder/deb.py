@@ -100,6 +100,7 @@ def apt_get_source(image_name, allow_errors=False, verbose=False, builddir='./bu
     """
     run_cmd("mkdir -p {}".format(builddir), allow_errors=allow_errors, verbose=verbose)
     cmd = "fakeroot apt-get source {}".format(image_name)
+    print("cmd='{}'".format(cmd))
     run_cmd(cmd, workingdir=builddir, allow_errors=allow_errors, verbose=verbose)
     # preceding command should leave a directory containing actual patched source
     path = find_directory(searchdir=builddir)
@@ -210,6 +211,26 @@ def deb_hack_abi_records(flavour, debian_dir, verbose=True):
         newf = os.path.join(d,c)
         print("src={}  dst={}".format(f, newf))
         shutil.copyfile(f, newf)
+
+
+def deb_hack_binary_arch(src_dir, verbose=True):
+    # Fixes issue with PopOS build on linux 6.6, I think it happens because the find comes up empty... which may be a symptom of a problem
+    filename = os.path.join(src_dir, 'debian/rules.d/2-binary-arch.mk')
+    compstr="find debian/$(1) -name '*.ko' -print0 | xargs -0 -n1 -P $(CONCURRENCY_LEVEL) zstd -19 --quiet --rm"
+    repstr="find debian/$(1) -name '*.ko' -print0 | xargs -r -0 -n1 -P $(CONCURRENCY_LEVEL) zstd -19 --quiet --rm"
+    if os.path.isfile(filename):
+        with open(filename, 'r') as file:
+            origdata = file.read()
+        newdata = origdata.replace(compstr, repstr)
+        if newdata == origdata:
+            print("file '{}' not changed".format(filename))
+            return
+        else:
+            print("file '{}' changed".format(filename))
+        with open(filename, 'w') as file:
+            file.write(newdata)
+    else:
+        print("file not found '{}'".format(filename))
 
 
 def deb_set_flavour(flavour, debian_dir, allow_errors=False, verbose=False):
@@ -406,6 +427,9 @@ def debian_style_build(args):
 
     printfancy("Mocking out current abi files")
     deb_hack_abi_records('swaphints', debian_dir, verbose=args.verbose)
+
+    printfancy("Modifying debian/rules.d/2-binary-arch.mk")
+    deb_hack_binary_arch(src_dir, verbose=args.verbose)
 
     # Build deb packages
     if args.nobuild:
