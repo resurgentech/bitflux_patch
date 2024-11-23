@@ -94,23 +94,24 @@ def test_git_build(args):
 
     kernel_version, src_dir = git_checkout_kernel(build_dir, kernel_version, args.giturl, args.git_ref_urls_path, args.rebuild)
 
-    # Match up the patch directory
-    patches_dir = select_patches_dir(kernel_version, verbose=args.verbose)
-    print("Found patches directory:    {}".format(patches_dir))
-    sys.stdout.flush()
-    if patches_dir is None:
-        raise
+    if not args.nopatch:
+        # Match up the patch directory
+        patches_dir = select_patches_dir(kernel_version, verbose=args.verbose)
+        print("Found patches directory:    {}".format(patches_dir))
+        sys.stdout.flush()
+        if patches_dir is None:
+            raise
 
-    if not args.rebuild:
-        # Go ahead and do patching of kernel sources
-        init_commit = patch_in("gitbuild", patches_dir, src_dir, verbose=args.verbose, clean_patch=True)
+        if not args.rebuild:
+            # Go ahead and do patching of kernel sources
+            init_commit = patch_in("gitbuild", patches_dir, src_dir, verbose=args.verbose, clean_patch=True)
 
-        if init_commit is not None:
-            filepath = os.path.join(patches_dir, "complete.patch")
-            commit_and_create_patch(filepath, src_dir, commit_hash=init_commit, verbose=args.verbose)
-        print("Patching Complete")
-    sys.stdout.flush()
-    sleep(3)
+            if init_commit is not None:
+                filepath = os.path.join(patches_dir, "complete.patch")
+                commit_and_create_patch(filepath, src_dir, commit_hash=init_commit, verbose=args.verbose)
+            print("Patching Complete")
+        sys.stdout.flush()
+        sleep(3)
 
     # Run kernel build
     if args.nobuild:
@@ -162,6 +163,7 @@ def test_git_build(args):
     copy_outputs("./swaphints_build_output.json", verbose=False)
     copy_outputs("./build/*.deb", verbose=False)
     copy_outputs("{}/.config".format(src_dir), verbose=False)
-    copy_outputs("{}/mm/vmscan.c".format(src_dir), verbose=False)
-    copy_outputs("{}/include/linux/swap.h".format(src_dir), verbose=False)
-    copy_outputs("{}/*.new".format(patches_dir), outputdir='./output/patches/', verbose=False)
+    if not args.nopatch:
+        copy_outputs("{}/mm/vmscan.c".format(src_dir), verbose=False)
+        copy_outputs("{}/include/linux/swap.h".format(src_dir), verbose=False)
+        copy_outputs("{}/*.new".format(patches_dir), outputdir='./output/patches/', verbose=False)

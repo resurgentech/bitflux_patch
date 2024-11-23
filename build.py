@@ -179,7 +179,7 @@ def fill_configs(args):
             if not config['settings'].get(arg, False):
                 config['settings'][arg] = dargs[arg]
 
-    for arg in ['clean', 'nobuild', 'buildnumber', 'rebuild']:
+    for arg in ['clean', 'nobuild', 'buildnumber', 'rebuild', 'nopatch']:
         if dargs.get(arg, False):
             config['settings'][arg] = dargs[arg]
 
@@ -205,7 +205,7 @@ def fill_configs(args):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--distro', help='Linux distro', default="ubuntu2004", type=str)
+    parser.add_argument('--distro', help='Linux distro', default="ubuntu2024", type=str)
     parser.add_argument('--buildnumber', help='Adds to package name to increment it', default="11", type=str)
     parser.add_argument('--kernel_version', help='kernel version', type=str)
     parser.add_argument('--build_type', help='Hacks for patching and building test [distro, file, git, gitminimal]', default='distro', type=str)
@@ -230,6 +230,7 @@ if __name__ == '__main__':
     parser.add_argument('--nopull', help="Use local docker images, don't pull - DEBUG", action='store_true')
     parser.add_argument('--nobuild', help="Don't build - DEBUG", action='store_true')
     parser.add_argument('--rebuild', help='Rebuild kernel, skips preparing - DEBUG', action='store_true')
+    parser.add_argument('--nopatch', help='This is just going to build a stock kernel', action='store_true')
     parser.add_argument('--clean', help='Extra clean up steps - DEBUG', action='store_true')
 
     args = parser.parse_args()
