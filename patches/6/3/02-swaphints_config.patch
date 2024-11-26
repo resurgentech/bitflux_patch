@@ -1,5 +1,5 @@
 diff --git a/fs/proc/Makefile b/fs/proc/Makefile
-index bd08616..af77b2f 100644
+index bd08616ed8ba..af77b2fcdc60 100644
 --- a/fs/proc/Makefile
 +++ b/fs/proc/Makefile
 @@ -34,3 +34,5 @@ proc-$(CONFIG_PROC_VMCORE)	+= vmcore.o

@@ -150,6 +150,7 @@ module_param(status_max_len, int, 0660);
 int reclaim_retries = 12;
 module_param(reclaim_retries, int, 0660);
 
+#ifdef SWAPHINT_DEBUG
 static void swaphints_print_page_flags(struct page *page)
 {
 	printk(KERN_ERR "Page Flags: %lx\n", page->flags);
@@ -191,6 +192,7 @@ static void swaphints_print_page_flags(struct page *page)
 		printk(KERN_ERR "Page Flags LRU_GEN_MASK\n");
 	printk(KERN_ERR "Page Flags printk end\n");
 }
+#endif
 
 /**
  * Internal Function to request the reclamation of a single specific page.
@@ -206,7 +208,9 @@ static unsigned long swaphints_swap_a_page(unsigned long pagenumber)
 	if (!page)
 		return -ERR_SWAPHINTS_NOPAGE;
 
-	//swaphints_print_page_flags(page);
+#ifdef SWAPHINT_DEBUG
+	swaphints_print_page_flags(page);
+#endif
 
 	if (PageTail(page))
 		return -ERR_SWAPHINTS_TAIL;

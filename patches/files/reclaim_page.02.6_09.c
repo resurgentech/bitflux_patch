@@ -40,7 +40,7 @@ extern unsigned long reclaim_page(struct folio *folio)
 	list_add(&folio->lru, &folio_list);
 	folio_put(folio);
 
-	retval = reclaim_pages(&folio_list);
+	retval = reclaim_pages(&folio_list, true);
 	return retval;
 }
 EXPORT_SYMBOL(reclaim_page);

@@ -83,3 +83,6 @@ Contains config and scripts to make and config vms.
 
 - **teardown.sh** - `./scripts/vagrant/teardown.sh centos8`  will destroy the vm created with setup.sh.
 
+
+
+git config --global --add safe.directory /opt/mirrors/linux-stable.git
