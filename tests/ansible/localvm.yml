@@ -1,0 +1,6 @@
+all:
+  hosts:
+    192.168.100.135:
+      ansible_become: true
+      ansible_ssh_user: packer
+      ansible_ssh_pass: packer

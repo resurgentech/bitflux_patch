@@ -10,18 +10,18 @@ from kernel_package_builder.common import *
 import jinja2
 
 
-def create_vagrant_tools_file(config, vagrant_box, machine_name):
-    with open(config['vagrant_template']) as f:
-        template = jinja2.Template(f.read())
-        templateoutput = template.render(vagrant_box=vagrant_box, machine_name=machine_name)
-    with open(config['vagrant_definition'], 'w') as f:
-        f.write(templateoutput)
+# def create_vagrant_tools_file(config, vagrant_box, machine_name):
+#     with open(config['vagrant_template']) as f:
+#         template = jinja2.Template(f.read())
+#         templateoutput = template.render(vagrant_box=vagrant_box, machine_name=machine_name)
+#     with open(config['vagrant_definition'], 'w') as f:
+#         f.write(templateoutput)
 
 
-def vagrant_tools(configs, args, script):
-    cmd = "cd {}; ./{}".format(configs['vagrant_dir'], script)
-    run_cmd(cmd, live_output=True)
-    sys.stdout.flush()
+# def vagrant_tools(configs, args, script):
+#     cmd = "cd {}; ./{}".format(configs['vagrant_dir'], script)
+#     run_cmd(cmd, live_output=True)
+#     sys.stdout.flush()
 
 
 def print_line(a, tag, l):
@@ -52,13 +52,18 @@ def print_ansible_output(out):
         raise
 
 
-def do_ansible(configs, script, args, extravars=None, interpreter=None):
+def do_ansible(configs, script, args, extravars=None, interpreter=None, localhost=False):
     ansible_dir = configs['ansible_dir']
-    invfile = os.path.join(configs['vagrant_dir'], "inventory.yaml")
-    playbook = os.path.join(ansible_dir, script)
     cmd = "cd {};".format(ansible_dir)
     cmd += " ANSIBLE_HOST_KEY_CHECKING=False"
-    cmd += " ansible-playbook -i {} {}".format(invfile, playbook)
+    playbook = os.path.join(ansible_dir, script)
+    cmd += " ansible-playbook"
+    if localhost:
+        invfile = os.path.join(configs['ansible_dir'], "localhost.yml")
+        cmd += " --connection=local"
+    else:
+        invfile = os.path.join(configs['ansible_dir'], "inventory.yml")
+    cmd += " -i {} {}".format(invfile, playbook)
     if interpreter is not None:
         cmd += " --extra-vars ansible_python_interpreter={}".format(interpreter)
     if extravars is not None:
@@ -106,7 +111,7 @@ def ansible_bitflux_install(configs, script, args, installer_config, installer_o
 
 
 def do_ansible_adhoc(configs, args, adhoc_cmd):
-    invfile = os.path.join(configs['vagrant_dir'], "inventory.yaml")
+    invfile = os.path.join(configs['vagrant_dir'], "inventory.yml")
     cmd = "ANSIBLE_HOST_KEY_CHECKING=False ansible all -i {} -m shell -a '{}'".format(invfile, adhoc_cmd)
     print("do_ansible_adhoc: '{}'".format(cmd), flush=True)
     exitcode, out, err = run_cmd(cmd, allow_errors=True)
@@ -129,7 +134,6 @@ def setup_config(basedir, args):
             "installer_filename": "installbitflux.run"
         },
         "installer_options": {
-            "license": "",
             "deviceid": "",
             "overrides": {}
         }
@@ -143,8 +147,6 @@ def setup_config(basedir, args):
     installer_options = helper__deepcopy(configs['installer_options'])
     if args.key is not None:
         installer_options['overrides']['bitflux_key_url'] = args.key
-    if args.license is not None:
-        installer_options['license'] = args.license
     if args.deviceid is not None:
         installer_options['deviceid'] = args.deviceid
     if args.no_grub_update is None:
@@ -211,6 +213,8 @@ def check_build_style(configs, args):
 
 def do_check_version(configs, args, params, expected):
     build_style = check_build_style(configs, args)
+    print("PARAMS")
+    print(params)
     exitcode, out, err = do_ansible_adhoc(configs, args, params[build_style]['cmd'])
     if exitcode != 0:
         print("exitcode: {}".format(exitcode))
@@ -451,12 +455,12 @@ if __name__ == '__main__':
     import argparse
     basedir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
     parser = argparse.ArgumentParser()
-    parser.add_argument('--vagrant_box', help='vagrant box for vagrant_tools to use', type=str)
-    parser.add_argument('--machine_name', help='name for vagrant_tools to give new vm', type=str)
+    parser.add_argument('--distro', help='distro to use', type=str)
+    parser.add_argument('--machine_name', help='name to give new vm', type=str)
     parser.add_argument('--key', help='Repo keys', type=str)
     parser.add_argument('--pkgrepo', help='apt/yum repo url', type=str)
     parser.add_argument('--pkgrepokernel', help='apt/yum repo for kernel url', type=str)
-    parser.add_argument('--license', help='license for bitflux', type=str)
+    #parser.add_argument('--license', help='license for bitflux', type=str)
     parser.add_argument('--deviceid', help='deviceid for bitflux', type=str)
     parser.add_argument('--noteardown', help='Don\'t clean up VMs, for debug', action='store_true')
     parser.add_argument('--no_grub_update', help='Don\'t tweak grub', action='store_true')
@@ -475,8 +479,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print_args(args, __file__)
 
-    if args.vagrant_box is None or args.machine_name is None:
-        print("need vagrant_box, machine_name")
+    if args.distro is None or args.machine_name is None:
+        print("need distro, machine_name")
         parser.print_help()
         sys.exit(1)
 
@@ -503,16 +507,22 @@ if __name__ == '__main__':
         print("--tarballcollector is deprecated")
 
     # Make machines.yaml file for vagrant_tools
-    create_vagrant_tools_file(configs, args.vagrant_box, args.machine_name)
+    #create_vagrant_tools_file(configs, args.vagrant_box, args.machine_name)
 
     # Clean up any failed tests that conflict
     # _default is kind of a hack but it works on our machines
-    virsh_domain = "{}_default".format(args.machine_name)
+    #virsh_domain = "{}_default".format(args.machine_name)
+    virsh_domain = "{}".format(args.machine_name)
     run_cmd("sudo virsh destroy --domain {}".format(virsh_domain), allow_errors=True)
     run_cmd("sudo virsh undefine --domain {} --remove-all-storage".format(virsh_domain), allow_errors=True)
 
     # create and start vm
-    vagrant_tools(configs, args, "vm_create.sh")
+    vmdisk_path = f"/var/lib/libvirt/images/{args.machine_name}.qcow2"
+    original_path = f"/var/lib/libvirt/images/{args.distro}.qcow2"
+    run_cmd(f"sudo cp {original_path} {vmdisk_path}")
+    a = {"vmdisk_path": vmdisk_path, "machine_name": args.machine_name, "PKR_VAR_username": "packer", "PKR_VAR_password": "packer"}
+    c = json.dumps(json.dumps(a))
+    do_ansible(configs, "vm_start.yml", args, extravars=c, localhost=True)
 
     # Update repos to get latest entries
     do_ansible(configs, "update_repos.yml", args)
@@ -551,6 +561,6 @@ if __name__ == '__main__':
 
     # create and start vm
     if not args.noteardown:
-        vagrant_tools(configs, args, "vm_teardown.sh")
+        do_ansible(configs, "vm_stop.yml", args, localhost=True)
 
     sys.exit(retval)

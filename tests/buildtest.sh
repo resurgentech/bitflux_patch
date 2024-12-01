@@ -73,31 +73,9 @@ KVONE=$(echo ${KERNEL_VERSION} | awk -F'.' '{print $1}')
 KVTWO=$(echo ${KERNEL_VERSION} | awk -F'.' '{print $2}')
 
 if [ -z ${DISTRO} ]; then
-  if [ "$KVONE" -lt "5" ]; then
-    if [ "$KVTWO" == "14" ]; then # =v4.14
-      DISTRO=amazonlinux2
-      DOCKER_IMAGE="resurgentech/kernel_build-amazonlinux2:latest"
-      VAGRANTBOX="jaredeh/ubuntu2004-server"
-    else # >v4.14 <v5.0
-      DISTRO=rockylinux8
-      DOCKER_IMAGE="resurgentech/kernel_build-rockylinux8:latest"
-      VAGRANTBOX="jaredeh/ubuntu2004-server"
-    fi
-  elif [ "$KVONE" -lt "6" ]; then
-    if [ "$KVTWO" -lt "12" ]; then # <v5.12
-      DISTRO=ubuntu2004
-      DOCKER_IMAGE="resurgentech/kernel_build-ubuntu2004:latest"
-      VAGRANTBOX="jaredeh/ubuntu2004-server"
-    else  # >=v5.12
-      DISTRO=ubuntu2204
-      DOCKER_IMAGE="resurgentech/kernel_build-ubuntu2204:latest"
-      VAGRANTBOX="jaredeh/ubuntu2204-server"
-    fi
-  else # v6.X
-    DISTRO=ubuntu2204
-    DOCKER_IMAGE="resurgentech/kernel_build-ubuntu2204:latest"
-    VAGRANTBOX="jaredeh/ubuntu2204-server"
-  fi
+  DISTRO=ubuntu2404
+  DOCKER_IMAGE="resurgentech/kernel_build-ubuntu2404:latest"
+  VMIMAGE="ubuntu2404"
 fi
 
 if [ ${KERNEL_VERSION} == "master" ]; then
@@ -181,10 +159,16 @@ if [ ! -z ${NO_TEST} ]; then
   exit 1
 fi
 
+cmd="sudo cp /var/lib/libvirt/images/${DISTRO}.qcow2 /var/lib/libvirt/images/manualtest.qcow2"
+echo $cmd
+echo ""
+if [ -z ${DRYRUN} ]; then
+  eval $cmd
+fi
+
 cmd=" \
-./tests/install_test.py --vagrant_box ${VAGRANTBOX} \
+./tests/install_test.py --distro ${DISTRO} \
                         --machine_name manualtest \
-                        --license ${BITFLUX_API_TOKEN} \
                         --deviceid manualtest \
                         --manual_modprobe \
                         --kernel_revision ${KERNEL_VERSION}-custom-1 \

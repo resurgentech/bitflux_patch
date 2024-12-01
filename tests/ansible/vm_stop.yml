@@ -1,0 +1,45 @@
+---
+
+- name: Create and configure a Libvirt VM
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Check the state of the VM
+      community.libvirt.virt:
+        command: info
+        name: "{{ machine_name }}"
+      register: vm_info1
+
+    - name: Shutdown the VM
+      community.libvirt.virt:
+        command: destroy
+        name: "{{ machine_name }}"
+        state: destroyed
+      when: vm_info1.get(machine_name, {}).get('state') == "running"
+
+    - name: Check if machine is down
+      community.libvirt.virt:
+        command: info
+        name: "{{ machine_name }}"
+      register: vm_info2
+
+    - name: Undefine the VM
+      community.libvirt.virt:
+        command: undefine
+        name: "{{ machine_name }}"
+      when: vm_info2.get(machine_name, {}).get('state') == "shutdown"
+
+    - name: Check that the VM is undefined
+      community.libvirt.virt:
+        command: info
+        name: "{{ machine_name }}"
+      register: vm_info3
+
+    - name: Wait for 3 seconds
+      pause:
+        seconds: 3
+
+    - name: Fail if VM is still defined
+      fail:
+        msg: "The VM '{{ machine_name }}' is still defined."
+      when: vm_info3.get(machine_name, '') != ''
