@@ -143,9 +143,12 @@ for COMMAND in "${COMMANDS[@]}"; do
       ;;
     generate)
       echo "  Generate..."
+      run_command "rm -rf ${PACKER_OUTPUT}"
+      # Uses PKR_VAR_* variables...
       cd ${PACKER_IMAGE_DEFS}/${PKR_VAR_distro}/http
       run_command "envsubst < user-data.tpl > user-data"
       cd ${PACKER_IMAGE_DEFS}/${PKR_VAR_distro}
+      run_command "packer init ."
       run_command "packer build ."
       run_command "sudo cp ${PKR_VAR_output_directory}/${PKR_VAR_distro} /var/lib/libvirt/images/${PKR_VAR_distro}.qcow2"
       ;;
