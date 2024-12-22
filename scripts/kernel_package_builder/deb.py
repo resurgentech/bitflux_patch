@@ -2,9 +2,10 @@
 
 from .common import *
 from .patching import *
-from jinja2 import Template
+import jinja2
+import jinja2.meta
 import yaml
-
+import glob
 
 def apt_update_upgrade(allow_errors=False, verbose=False, live_output=False):
     """
@@ -68,15 +69,23 @@ def debsrc_list_srt_func(elem):
     return elem['sorthelper']
 
 
-def apt_get_linux_image_name(search_pkg, allow_errors=False, verbose=False):
+def apt_get_package_stats(search_pkg, allow_errors=False, verbose=False):
     """
-    Return the newest latest linux kernel image package name
+    Returns the latest apt package stats
     """
     image_list = apt_cache_show(search_pkg, allow_errors=allow_errors, verbose=verbose)
 
     # sort list on sorthelper key
     sorted_image_list = sorted(image_list, key=debsrc_list_srt_func)
     fullimage = sorted_image_list[-1]
+    return fullimage
+
+
+def apt_get_linux_image_name(search_pkg, allow_errors=False, verbose=False):
+    """
+    Return the newest latest linux kernel image package name
+    """
+    fullimage = apt_get_package_stats(search_pkg, allow_errors=allow_errors, verbose=verbose)
     print("found image '{}'".format(fullimage))
 
     if isinstance(fullimage["Depends"], list):
@@ -212,27 +221,29 @@ def deb_hack_abi_records(flavour, debian_dir, verbose=True):
         shutil.copyfile(f, newf)
 
 
-def deb_set_flavour(flavour, debian_dir, allow_errors=False, verbose=False):
+def deb_set_flavour(flavour, orig_flavour, debian_dir, allow_errors=False, verbose=False):
     '''
     Generates flavour specific files for our new flavour
     '''
     file_pair = [
-        ['control.d/generic.inclusion-list', 'control.d/{}.inclusion-list'.format(flavour)],
-        ['control.d/vars.generic', 'control.d/vars.{}'.format(flavour)]
+        [f"control.d/{orig_flavour}.inclusion-list", f"control.d/{flavour}.inclusion-list"],
+        [f"control.d/vars.{orig_flavour}", f"control.d/vars.{flavour}"]
     ]
 
     # Hack for checking for old way of doing flavours
-    if os.path.isfile(os.path.join(debian_dir, 'config/amd64/config.flavour.generic')):
-        file_pair.append(['config/amd64/config.flavour.generic', 'config/amd64/config.flavour.{}'.format(flavour)])
+    if os.path.isfile(os.path.join(debian_dir, f"config/amd64/config.flavour.{orig_flavour}")):
+        file_pair.append([f"config/amd64/config.flavour.{orig_flavour}", 'config/amd64/config.flavour.{}'.format(flavour)])
 
     for a in file_pair:
         duplicate_file(a[0], a[1], workingdir=debian_dir, verbose=verbose)
     sed_sets = [
-        ['amd64-generic', 'amd64-{}'.format(flavour), 'config/annotations'],
-        ['amd64 generic lowlatency', 'amd64 generic lowlatency {}'.format(flavour), 'etc/getabis'],
-        ['amd64 generic', 'amd64 generic lowlatency {}'.format(flavour), 'etc/getabis'],
-        ['generic lowlatency', flavour, 'rules.d/amd64.mk'],
-        ['generic', flavour, 'rules.d/amd64.mk']
+        # We might not need this either...
+        [f"amd64-{orig_flavour}", f"amd64-{flavour}", 'config/annotations'],
+        # old versions had this... deprecated for now
+        # ['amd64 generic lowlatency', 'amd64 generic lowlatency {}'.format(flavour), 'etc/getabis'],
+        # ['amd64 generic', 'amd64 generic lowlatency {}'.format(flavour), 'etc/getabis'],
+        [f"{orig_flavour} lowlatency", flavour, 'rules.d/amd64.mk'],
+        [orig_flavour, flavour, 'rules.d/amd64.mk']
     ]
     for a in sed_sets:
         filepath = os.path.join(debian_dir, a[2])
@@ -293,6 +304,40 @@ def build_debs(src_dir, allow_errors=False, verbose=False, live_output=True):
     run_cmd(cmd, workingdir=src_dir, allow_errors=allow_errors, verbose=verbose, live_output=live_output, no_stdout=True)
 
 
+def get_package_stats(version_ref_pkg, package_dir="./build"):
+    for (dirpath, dirnames, filenames) in os.walk(package_dir):
+        for filename in filenames:
+            subfilenames = filename.split("_", 1)
+            if version_ref_pkg in filename:
+                versionstr = subfilenames[1].split(".deb", 1)
+                versionchunks = versionstr[0].split("_", 1)
+                versionnumber = versionchunks[0]
+                architecture = versionchunks[1]
+                return versionnumber, architecture
+    print("Failure in get_package_version()")
+    print(f"  Could not find version_ref_pkg: {version_ref_pkg}")
+    exit(1)
+
+def render_jinja_template(template_content, data):
+    template = jinja2.Template(template_content)
+    parsed_content = template.environment.parse(template_content)
+    variables = jinja2.meta.find_undeclared_variables(parsed_content)
+    missing_keys = []
+    for variable in variables:
+        if variable not in data:
+            missing_keys.append(variable)
+    if len(missing_keys) > 0:
+        print("Failed render_jinja_template()!!!")
+        print(f"  Missing keys: {missing_keys}")
+        print(f"  Data:")
+        print(f"{data}")
+        print(f"  Template:")
+        print(f"{template_content}")
+        exit(1)
+    templateoutput = template.render(data)
+    return templateoutput
+
+
 def filter_pkg_for_meta_pkg(pkg_filters, filename):
     if not filename.endswith(".deb"):
         return True
@@ -302,39 +347,125 @@ def filter_pkg_for_meta_pkg(pkg_filters, filename):
     return False
 
 
-def build_meta_pkg(ver_ref_pkg, pkg_filters, metapkg_template, allow_errors=False, verbose=False, live_output=True):
+def update_list_with_orig_flavour(key, orig_pkg, flavour, orig_flavour, builddir, overrides=[], missing_okay=False):
+    elements = orig_pkg.get(key,[])
+    # sometimes the list is a string, which messes stuff up here
+    if not isinstance(elements, list):
+        elements = [elements]
+    # if the list is empty, nothing to edit
+    if len(elements) == 0:
+        return ""
+    # iterate over the elements, and update the flavour when relevent
+    missing_files = []
+    fixedelements = []
+    for e in elements:
+        if orig_flavour in e:
+            fixed_e = e.replace(orig_flavour, flavour)
+            # Processing overrides if any
+            for override in overrides:
+                p = re.compile(override['pattern'])
+                if p.match(fixed_e):
+                    fixed_e = fixed_e.replace(override['original'], override['replacement'])
+            fixedelements.append(fixed_e)
+            # looking for matching files
+            fname = fixed_e.split()[0]
+            deb_files = glob.glob(f"{builddir}/{fname}*.deb")
+            if len(deb_files) == 0:
+                missing_files.append(fname)
+        else:
+            fixedelements.append(e)
+    if len(missing_files) > 0 and not missing_okay:
+        print(f"Missing files for {key}:")
+        for f in missing_files:
+            print(f"  {f}")
+    output = ", ".join(fixedelements)
+    return output
+
+
+def build_meta_pkg(metapkg_config, maintainer, versionnumber, arch, flavour, orig_flavour, builddir='./build', allow_errors=False, verbose=False, live_output=True):
     """
     Builds a meta package that installs all other packages
     """
-    dependentpkgnames = []
-    versionnumber = ["", ""]
-    for (dirpath, dirnames, filenames) in os.walk("./build"):
-        for filename in filenames:
-            # We only need a few primary packages we'll filter those out.
-            if filter_pkg_for_meta_pkg(pkg_filters, filename):
-                continue
-            subfilenames = filename.split("_", 1)
-            dependentpkgnames.append(subfilenames[0])
-            print(subfilenames[0])
-            # Picking a file and extracting version numbers from it's name
-            if ver_ref_pkg in filename:
-                versionnumber = subfilenames[1].split(".deb", 1)
-                architecture = versionnumber[0].split("_", 1)
-    print(versionnumber)
-    # use jinja template to create package definiation for equivs to build
-    template_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'template', metapkg_template + ".j2")
-    with open(template_path) as file_:
-        template = Template(file_.read())
-    templateoutput = template.render(dependencies=", ".join(dependentpkgnames), version=architecture[0], arch=architecture[1])
+    # Check for required keys
+    required_keys = ['orig_pkg_name', 'pkg_name', 'jinja_template']
+    missing_keys = []
+    for key in required_keys:
+        if key not in metapkg_config.keys():
+            missing_keys.append(key)
+    if len(missing_keys) > 0:
+        n = metapkg_config.get('orig_pkg_name','unknown')
+        print(f"Failure in build_meta_pkg({n})")
+        print("  Missing keys:")
+        for key in missing_keys:
+            print(f"    '{key}'")
+        print()
+        print("metapkg_config:")
+        print("```")
+        print(metapkg_config)
+        print("```")
+        sys.exit(1)
+
+    template_content = metapkg_config['jinja_template']
+    pkg_name = metapkg_config['pkg_name']
+    orig_pkg_name = metapkg_config['orig_pkg_name']
+    overrides = metapkg_config.get('overrides', [])
+
+    printfancy(f"Building {pkg_name}")
+
+    # Get the package stats from apt-cache to get some info
+    orig_pkg = apt_get_package_stats(orig_pkg_name, allow_errors=allow_errors, verbose=verbose)
+
+    # Collect data for jinja2 template insertion
+    data = {}
+    data['Package'] = pkg_name
+    data['Architecture'] = arch
+    data['Version'] = versionnumber
+    data['Maintainer'] = maintainer
+
+    data['Provides'] = update_list_with_orig_flavour('Provides', orig_pkg, flavour, orig_flavour, builddir, missing_okay=True)
+    data['Recommends'] = update_list_with_orig_flavour('Recommends', orig_pkg, flavour, orig_flavour, builddir)
+    data['Depends'] = update_list_with_orig_flavour('Depends', orig_pkg, flavour, orig_flavour, builddir, overrides=overrides)
+
+    if verbose:
+        print()
+        print(f"orig_pkg:")
+        print(json.dumps(orig_pkg, indent=2))
+        print()
+        print(f"data:")
+        print(json.dumps(data, indent=2))
+        print()
+
+    # Use jinja template to create package definiation for equivs to build
+    templateoutput = render_jinja_template(template_content, data)
     print(templateoutput)
-    with open('./build/{}'.format(metapkg_template), "w") as file_:
-        file_.write(templateoutput)
+
+    # Write out metapkg template
+    with open(f"{builddir}/{pkg_name}", "w") as f:
+        f.write(templateoutput)
     # Actually make metapkg
-    run_cmd("equivs-build {}".format(metapkg_template), workingdir="./build", allow_errors=allow_errors, verbose=verbose, no_stdout=True)
+    run_cmd(f"equivs-build {metapkg_template}", workingdir=builddir, allow_errors=allow_errors, verbose=verbose, no_stdout=True)
+    # Rename the metapkg to something easier to deal with
+    os.rename(f"{builddir}/{pkg_name}", f"{builddir}/{pkg_name}.template")
 
 
 # Find package without building
-def get_package_deb(args):
+def get_package_deb(distro_config_path):
+    # Get settings
+    with open(distro_config_path) as f:
+        distro_config = yaml.safe_load(f)
+    try:
+        search_pkg = distro_config["search_pkg"]
+    except KeyError:
+        print("Failed in get_package_deb()!!!")
+        print(f"  No 'search_pkg' in --distro_config={distro_config_path}")
+        sys.exit(1)
+    try:
+        orig_flavour = distro_config["orig_flavour"]
+    except KeyError:
+        print("Failed in get_package_deb()!!!")
+        print(f"  No 'orig_flavour' in --distro_config={distro_config_path}")
+        sys.exit(1)
+
     # Update and upgrade apt repos to latest
     apt_update_upgrade(allow_errors=True, live_output=False)
     print("apt repos updated and upgraded")
@@ -342,7 +473,7 @@ def get_package_deb(args):
     sleep(3)
 
     # Return the newest latest linux kernel image package name
-    image_name = apt_get_linux_image_name(args.search_pkg, verbose=False)
+    image_name = apt_get_linux_image_name(search_pkg, orig_flavour, verbose=False)
     print("Found image name:           {}".format(image_name))
     sys.stdout.flush()
     return image_name
@@ -356,11 +487,39 @@ def printfancy(str, timeout=0.1):
     sleep(timeout)
 
 
-def debian_style_build(args):
-    ver_ref_pkg = args.ver_ref_pkg
-    search_pkg = args.search_pkg
-    pkg_filters = json.loads(args.pkg_filters)
-    metapkg_template = args.metapkg_template
+def debian_style_build(distro_config_path, buildnumber, maintainer, verbose=False):
+    # Get settings
+    if not os.path.exists(distro_config_path):
+        print("Failed in debian_style_build()!!!")
+        print(f"  --distro_config={distro_config_path} invalid")
+        print(f"  file {distro_config_path} does not exist")
+        sys.exit(1)
+    with open() as f:
+        distro_config = yaml.safe_load(f)
+    required_keys = ['search_pkg', 'orig_flavour', 'flavour', 'version_ref_pkg', 'distro', 'metapkgs']
+    missing_keys = []
+    for key in required_keys:
+        if key not in distro_config.keys():
+            missing_keys.append(key)
+    if len(missing_keys) > 0:
+        print(f"Failure in debian_style_build()  --distro_config={distro_config_path}")
+        print("  Missing keys:")
+        for key in missing_keys:
+            print(f"    '{key}'")
+        sys.exit(1)
+
+    search_pkg = distro_config["search_pkg"]
+    orig_flavour = distro_config["orig_flavour"]
+    flavour = distro_config["flavour"]
+    version_ref_pkg = distro_config["version_ref_pkg"]
+    distro = distro_config["distro"]
+    metapkgs = distro_config["metapkgs"]
+    if not isinstance(metapkgs, list):
+        print("Failed in debian_style_build()!!!")
+        print(f"  --distro_config={distro_config_file}")
+        print(f"  'metapkgs' must be a list")
+        sys.exit(1)
+
     printfancy("BUILDING DEBIAN STYLE PACKAGE")
 
     # Update and upgrade apt repos to latest
@@ -369,56 +528,71 @@ def debian_style_build(args):
     printfancy("DONE - apt repos updated and upgraded", timeout=3)
 
     bitflux_version = get_bitflux_version()
-    printfancy("Set bitflux_version:        {}".format(bitflux_version), timeout=3)
+    printfancy(f"Set bitflux_version:        {bitflux_version}", timeout=3)
 
     # Return the newest latest linux kernel image package name
-    image_name = apt_get_linux_image_name(search_pkg, verbose=args.verbose)
-    printfancy("Found image name:           {}".format(image_name))
+    image_name = apt_get_linux_image_name(search_pkg, orig_flavour, verbose=verbose)
+    printfancy(f"Found image name:           {image_name}")
 
     # Search patches for something that should match the kernel image package
     patches_dir = select_patches_dir(image_name, patches_root_dir='./patches')
-    printfancy("Found patches directory:    {}".format(patches_dir))
+    printfancy(f"Found patches directory:    {patches_dir}")
     if patches_dir is None:
         raise
 
     # Download source code and return where the kernel source code is located
-    #src_dir = apt_get_source('linux', verbose=args.verbose)
-    src_dir = apt_get_source(image_name, verbose=args.verbose)
-    printfancy("Found kernel src directory: {}".format(src_dir))
+    #src_dir = apt_get_source('linux', verbose=verbose)
+    src_dir = apt_get_source(image_name, verbose=verbose)
+    printfancy(f"Found kernel src directory: {src_dir}")
 
     debian_dir = deb_find_debian_dir(src_dir)
-    printfancy("Found DEBIAN directory: {}".format(debian_dir))
+    printfancy(f"Found DEBIAN directory: {debian_dir}")
 
     # Do patching steps
-    init_commit = patch_in(args.distro, patches_dir, src_dir, verbose=args.verbose, clean_patch=True)
+    init_commit = patch_in(distro, patches_dir, src_dir, verbose=verbose, clean_patch=True)
 
+    # Handle flavour hacking
     printfancy("Creating flavour swaphints config files")
-    deb_set_flavour('swaphints', debian_dir, verbose=True)
+    deb_set_flavour(flavour, orig_flavour, debian_dir, verbose=True)
     commit_and_create_patch('flavour', src_dir, verbose=True)
 
+    # Create the final patching
     if init_commit is not None:
         filepath = os.path.join(patches_dir, "complete.patch")
-        commit_and_create_patch(filepath, src_dir, commit_hash=init_commit, verbose=args.verbose)
+        commit_and_create_patch(filepath, src_dir, commit_hash=init_commit, verbose=verbose)
     printfancy("Patching Complete", timeout=3)
 
+    # Modify debian changelog
     printfancy("Modifying debian changelog")
-    deb_hack_changelog(bitflux_version, src_dir, buildnum=args.buildnumber, verbose=args.verbose, clean_patch=True)
+    deb_hack_changelog(bitflux_version, src_dir, buildnum=buildnumber, verbose=verbose, clean_patch=True)
 
-    printfancy("Mocking out current abi files")
-    deb_hack_abi_records('swaphints', debian_dir, verbose=args.verbose)
+    # DEPRECATED functionality required for older builds pre 6.8 24.04, not updated with flavour, orig_flavour
+    try:
+        printfancy("Mocking out current abi files")
+        deb_hack_abi_records('swaphints', debian_dir, verbose=verbose)
+    except:
+        print("Failed to mock out current abi files")
 
     # Build deb packages
-    if args.nobuild:
+    if nobuild:
         return
     printfancy("Build .deb files")
     try:
-        build_debs(src_dir, verbose=args.verbose)
+        build_debs(src_dir, verbose=verbose)
     except:
-        build_debs_hack(src_dir, verbose=args.verbose)
-    printfancy("Build meta_pkg .deb")
-    build_meta_pkg(ver_ref_pkg, pkg_filters, metapkg_template)
+        build_debs_hack(src_dir, verbose=verbose)
+
+    # Getting version number from built debs
+    versionnumber, arch = get_package_stats(version_ref_pkg)
+    printfancy(f"Package version:            {versionnumber}  arch: {arch}")
+
+    # Build meta packages
+    printfancy("Build meta packages")
+    for metapkg_config in metapkgs:
+        build_meta_pkg(metapkg_config, maintainer, versionnumber, arch, flavour, orig_flavour, verbose=verbose)
 
     # Copy outputs
-    run_cmd("rm -rf ./output;", allow_errors=True, verbose=args.verbose)
-    copy_outputs("./build/*.deb", verbose=args.verbose)
-    copy_outputs("{}/*.new".format(patches_dir), outputdir='./output/patches/', verbose=args.verbose)
+    run_cmd("rm -rf ./output;", allow_errors=True, verbose=verbose)
+    copy_outputs("./build/*.deb", verbose=verbose)
+    copy_outputs("./build/*.template", outputdir='./output/templates/', verbose=verbose)
+    copy_outputs(f"{patches_dir}/*.new", outputdir='./output/patches/', verbose=verbose)

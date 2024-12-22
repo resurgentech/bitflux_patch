@@ -1,5 +1,8 @@
 FROM {{docker_image}}
 
-COPY . /bitflux
+COPY patches /bitflux/patches
+COPY scripts /bitflux/scripts
+COPY build.py /bitflux
+COPY tests /bitflux/tests
 RUN mkdir -p /bitflux/build
 WORKDIR /bitflux

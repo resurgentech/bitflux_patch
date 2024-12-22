@@ -86,3 +86,18 @@ Contains config and scripts to make and config vms.
 
 
 git config --global --add safe.directory /opt/mirrors/linux-stable.git
+
+./build.py --nodocker --build_type distro --distro ubuntu2404 --search_pkg linux-image-unsigned-*-generic
+rustup install 1.75.0
+rustup override set 1.75.0
+rustup component add rust-src
+
+scripts/min-tool-version.sh
+
+huh.  swapcache is high.  IS there an issue with refcount?  Am I not freeing something?
+Make memhog madvise itself. see what that does.
+
+./build.py --nodocker --build_type distro --distro ubuntu2404 --search_pkg linux-image-unsigned-*-generic
+TMPDIR=$(pwd)/tmp ./build.py --nodocker --build_type distro --distro ubuntu2404 --search_pkg linux-image-unsigned-*-aws
+
+TMPDIR=$(pwd)/tmp ./build.py --nodocker --build_type distro --distro ubuntu2404 --orig_flavour aws --flavour swaphints

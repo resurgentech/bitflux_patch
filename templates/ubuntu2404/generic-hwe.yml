@@ -1,0 +1,4 @@
+flavour: generic
+metapkgs:
+  linux-image-generic-hwe-24.04:
+  linux-generic-hwe-24.04:

@@ -1,0 +1,49 @@
+distro: ubuntu2404
+flavour: awsswaphints
+orig_flavour: aws
+search_pkg: linux-image-unsigned-*-aws
+version_ref_pkg: linux-image-unsigned
+metapkgs:
+  - orig_pkg_name: linux-headers-aws
+    pkg_name: linux-headers-awsswaphints
+    jinja_template: |
+      Package: {{ Package }}
+      Architecture: {{ Architecture }}
+      Version: {{ Version }}
+      Priority: optional
+      Section: kernel
+      Origin: BitFlux
+      Maintainer: {{ Maintainer }}
+      Depends: {{ Depends }}
+      Description-en: Linux kernel headers for Amazon Web Services (AWS) systems with swaphints enabled.  This package will always depend on the latest kernel headers available for Amazon Web Services (AWS) systems with swaphints enabled.
+  - orig_pkg_name: linux-image-aws
+    pkg_name: linux-image-awsswaphints
+    overrides:
+      - pattern: ^linux-image-\d+
+        original: linux-image
+        replacement: linux-image-unsigned
+    jinja_template: |
+      Package: {{ Package }}
+      Architecture: {{ Architecture }}
+      Version: {{ Version }}
+      Priority: optional
+      Section: kernel
+      Origin: BitFlux
+      Maintainer: {{ Maintainer }}
+      Provides: {{ Provides }}
+      Depends: {{ Depends }}
+      Description-en: Linux kernel image for Amazon Web Services (AWS) systems with swaphints enabled.  This package will always depend on the latest kernel image available for Amazon Web Services (AWS) systems with swaphints enabled.
+  - orig_pkg_name: linux-aws
+    pkg_name: linux-awsswaphints
+    jinja_template: |
+      Package: {{ Package }}
+      Architecture: {{ Architecture }}
+      Version: {{ Version }}
+      Priority: optional
+      Section: kernel
+      Origin: BitFlux
+      Maintainer: {{ Maintainer }}
+      Provides: {{ Provides }}
+      Depends: {{ Depends }}
+      Recommends: {{ Recommends }}
+      Description-en: Complete Linux kernel for Amazon Web Services (AWS) systems with swaphints enabled.  This package will always depend on the latest complete Linux kernel available for Amazon Web Services (AWS) systems with swaphints enabled.

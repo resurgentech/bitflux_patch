@@ -151,6 +151,7 @@ for COMMAND in "${COMMANDS[@]}"; do
       run_command "packer init ."
       run_command "packer build ."
       run_command "sudo cp ${PKR_VAR_output_directory}/${PKR_VAR_distro} /var/lib/libvirt/images/${PKR_VAR_distro}.qcow2"
+      #run_command "sudo rm -rf ${PKR_VAR_output_directory}"
       ;;
     start)
       echo "  Starting VM..."

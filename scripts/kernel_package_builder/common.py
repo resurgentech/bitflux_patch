@@ -243,3 +243,27 @@ def print_args(oargs, filename, msg="Args into"):
     print("!----------------------------------------------------------------------------")
     print(json.dumps(args, indent=4))
     print("!----------------------------------------------------------------------------")
+
+def pretty_time_delta(seconds):
+    # if isinstance(timedelta):
+    #     seconds = delta.total_seconds()
+    # else:
+    #     seconds = delta
+    seconds = int(seconds)
+    if seconds < 1:
+        return "less than 1s"
+    days, seconds = divmod(seconds, 86400)
+    hours, seconds = divmod(seconds, 3600)
+    minutes, seconds = divmod(seconds, 60)
+
+    parts = []
+    if days > 0:
+        parts.append(f"{days}d")
+    if hours > 0:
+        parts.append(f"{hours}h")
+    if minutes > 0:
+        parts.append(f"{minutes}m")
+    if seconds > 0:
+        parts.append(f"{seconds}s")
+
+    return " ".join(parts)

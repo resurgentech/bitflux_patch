@@ -3,7 +3,7 @@
 
 from scripts.kernel_package_builder import *
 import jinja2
-
+import time
 
 def compile_j2_template(template_path, output_path, config):
     with open(template_path) as f:
@@ -17,6 +17,8 @@ class KernelBuilder:
 
     def __init__(self, config):
         self.config = config
+        self.metadata = {'config': config}
+        self.metadata['start'] = time.time()
 
     def run_cmd(self, cmd, verbose=None, live_output=True, no_stdout=False):
         lverbose = verbose if verbose is not None else self.config['verbose']
@@ -133,46 +135,35 @@ class KernelBuilder:
         self.run_cmd("docker image rm -f {}".format(self.config['image_name']))
 
     def done(self):
-        print("==============================================================================")
-        print("=== DONE =====================================================================")
-        print("==============================================================================")
+        self.metadata['end'] = time.time()
+        self.metadata['elapsed'] = self.metadata['end'] - self.metadata['start']
+        tdh = pretty_time_delta(self.metadata['elapsed'])
+        spacer = "=============================================================================="
+        doneline = f"=== DONE in {tdh} "
+        doneline = doneline + "="*(len(spacer)-len(doneline))
+        print(spacer)
+        print(doneline)
+        print(spacer)
 
 
 def fill_configs(args):
     dargs = vars(args)
-
-    if args.settings is not None and args.distro_config is not None:
-        print("Can't have --settings and --distro_config")
-        print(json.dump(dargs))
-        raise
+    orig_args = json.loads(json.dumps(dargs, indent=4))
 
     config = {}
     config['basedir'] = os.path.join(os.path.dirname(os.path.realpath(__file__)))
     config['container_name'] = args.jobname
     config['image_name'] = "resurgentech_local/{}:latest".format(args.jobname)
 
-    for arg in ['verbose', 'dumpall', 'nopull']:
+    for arg in ['verbose', 'dumpall', 'nopull', 'nodocker', 'distro']:
         config[arg] = dargs[arg]
 
     ## Settings gets passed on to next level
-    if args.settings is not None:
-        # 1) If we get the --settings on the cli we're going to just use it
-        config['settings'] = json.loads(args.settings)
-        config['settings']['distro'] = args.distro
-    elif args.distro_config is not None:
-        # 2) Let's read this from a config file
-        distro_config = read_yaml_file(args.distro_config)
-        config['settings'] = distro_config['build']['kernel']
-        config['settings']['distro'] = distro_config['name']
-    else:
-        # 3) Make a 'settings' dict from the commandline options
-        config['settings'] = {}
-        for arg in ['ver_ref_pkg', 'search_pkg', 'pkg_filters', 'metapkg_template', 'distro']:
-            if dargs.get(arg, False):
-                if arg in ['pkg_filters']:
-                    config['settings'][arg] = json.loads(dargs[arg])
-                else:
-                    config['settings'][arg] = dargs[arg]
+    # 3) Make a 'settings' dict from the commandline options
+    config['settings'] = {}
+    for arg in ['distro_config']:
+        if dargs.get(arg, False):
+            config['settings'][arg] = dargs[arg]
 
     for arg in ['build_type', 'kernel_version']:
         if dargs.get(arg, False):
@@ -183,29 +174,18 @@ def fill_configs(args):
         if dargs.get(arg, False):
             config['settings'][arg] = dargs[arg]
 
-    # if --settings has nodocker, use it and remove it
-    config['nodocker'] = config['settings'].get('nodocker', False)
-    if config['settings'].get('nodocker', None) is not None:
-        # we don't want to pass this on
-        del config['settings']['nodocker']
-    if args.nodocker:
-        config['nodocker'] = True
 
     # Set up docker image
-    if config['settings'].get('docker_image', None) is None:
-        config['docker_image'] = args.docker_image
-    else:
-        # we don't want to pass this on
-        config['docker_image'] = config['settings']['docker_image']
-        del config['settings']['docker_image']
+    config['docker_image'] = args.docker_image
 
+    config['args'] = orig_args
     return config
 
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--distro', help='Linux distro', default="ubuntu2024", type=str)
+    parser.add_argument('--distro', help='Linux distro', default="ubuntu2404", type=str)
     parser.add_argument('--buildnumber', help='Adds to package name to increment it', default="11", type=str)
     parser.add_argument('--kernel_version', help='kernel version', type=str)
     parser.add_argument('--build_type', help='Hacks for patching and building test [distro, file, git, gitminimal]', default='distro', type=str)
@@ -215,14 +195,11 @@ if __name__ == '__main__':
     parser.add_argument('--checkonly', help='Return the kernel package name', action='store_true')
 
     # .deb specifics
-    parser.add_argument('--ver_ref_pkg', help='For .deb, reference pkg search', default='linux-image-unsigned', type=str)
-    parser.add_argument('--search_pkg', help='For .deb, reference pkg search', default='linux-image-generic', type=str)
-    parser.add_argument('--pkg_filters', help='For .deb, which pkgs to deal with', default='["hwe", "cloud", "dkms", "tools", "buildinfo"]', type=str)
-    parser.add_argument('--metapkg_template', help='For .deb, what to call new package', default='linux-image-swaphints', type=str)
+    parser.add_argument('--distro_config', help='Distro build settings', default='./templates/ubuntu2404/generic-hwe.yml', type=str)
+    parser.add_argument('--maintainer', help='Maintainer line', default='unknown <unknown@unknown.unknown>', type=str)
 
     # Allow for in cli complex options
-    parser.add_argument('--settings', help='Overrides for building in escaped json', type=str)
-    parser.add_argument('--distro_config', help='Settings imported from a file', type=str)
+    #parser.add_argument('--settings', help='Overrides for building in escaped json', type=str)
 
     # DEBUG specifics
     parser.add_argument('--verbose', help='Verbose mode - DEBUG', action='store_true')
@@ -235,9 +212,14 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    print_args(args, __file__)
-
-    config = fill_configs(args)
+    try:
+        config = fill_configs(args)
+    except:
+        # For debugging issues with fill_config
+        print_args(args, __file__)
+        print("!"*60)
+        print("fill_configs failed")
+        config = fill_configs(args)
 
     print_args(config, __file__, msg="Processed Config for")
 
@@ -246,6 +228,10 @@ if __name__ == '__main__':
         kb = KernelBuilder(config)
         kb.check()
         sys.exit(0)
+
+    # Clean up build
+    if args.clean or not args.nobuild:
+        shutil.rmtree("./build", ignore_errors=True)
 
     kb = KernelBuilder(config)
     kb.build()
