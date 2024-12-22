@@ -1,4 +1,5 @@
 distro: ubuntu2404
+style: deb
 flavour: awsswaphints
 orig_flavour: aws
 search_pkg: linux-image-unsigned-*-aws

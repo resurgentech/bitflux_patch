@@ -42,11 +42,22 @@ if __name__ == '__main__':
         retval = test_git_build(args)
         sys.exit(retval)
 
-    # Test distro build
-    if args.style == 'deb':
-        debian_style_build(args.distro_config, args.buildnumber, args.maintainer, verbose=verbose)
-    elif args.style == 'rpm':
-        rpm_style_build() # TODO: Implement options
-    elif args.style == 'yum':
-        yum_style_build(args) # TODO: Implement options
+    # Find the distro config
+    build_style = 'none'
+    try:
+        with open(args.distro_config) as f:
+            distro_config = yaml.safe_load(f)
+        build_style = distro_config['style']
+    except:
+        print("Can't find 'style' in distro config")
 
+    # Test distro build
+    if build_style == 'deb':
+        debian_style_build(args.distro_config, args.buildnumber, args.maintainer, verbose=args.verbose)
+    elif build_style == 'rpm':
+        rpm_style_build() # TODO: Implement options
+    elif build_style == 'yum':
+        yum_style_build(args) # TODO: Implement options
+    else:
+        print(f"Unknown build style: {build_style}")
+        sys.exit(1)

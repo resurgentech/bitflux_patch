@@ -165,7 +165,7 @@ def deb_hack_changelog(bitflux_version, src_dir, buildnum=None, verbose=True, cl
             original_contents_array = file.readlines()
         line = original_contents_array[0]
         print("old changelog line from '{}' = '{}'".format(changelog_path, line))
-        m = re.search('\([0-9\.]+-([0-9\.]+)', line)
+        m = re.search(r'\([0-9\.]+-([0-9\.]+)', line)
         if not m:
             continue
         a = m.group(0)
@@ -494,8 +494,14 @@ def debian_style_build(distro_config_path, buildnumber, maintainer, verbose=Fals
         print(f"  --distro_config={distro_config_path} invalid")
         print(f"  file {distro_config_path} does not exist")
         sys.exit(1)
-    with open() as f:
-        distro_config = yaml.safe_load(f)
+    try:
+        with open(distro_config_path, 'r') as f:
+            distro_config = yaml.safe_load(f)
+    except Exception as e:
+        print("Failed in debian_style_build()!!!")
+        print(f"  --distro_config={distro_config_path} doesn't appear to be a valid yaml file")
+        print(f"  Exception: {e}")
+        sys.exit(1)
     required_keys = ['search_pkg', 'orig_flavour', 'flavour', 'version_ref_pkg', 'distro', 'metapkgs']
     missing_keys = []
     for key in required_keys:
