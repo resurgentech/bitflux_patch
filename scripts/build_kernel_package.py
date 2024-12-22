@@ -53,7 +53,7 @@ if __name__ == '__main__':
 
     # Test distro build
     if build_style == 'deb':
-        debian_style_build(args.distro_config, args.buildnumber, args.maintainer, verbose=args.verbose)
+        debian_style_build(args.distro_config, args.buildnumber, args.maintainer, args.verbose, args.nobuild)
     elif build_style == 'rpm':
         rpm_style_build() # TODO: Implement options
     elif build_style == 'yum':

@@ -487,7 +487,7 @@ def printfancy(str, timeout=0.1):
     sleep(timeout)
 
 
-def debian_style_build(distro_config_path, buildnumber, maintainer, verbose=False):
+def debian_style_build(distro_config_path, buildnumber, maintainer, verbose, nobuild):
     # Get settings
     if not os.path.exists(distro_config_path):
         print("Failed in debian_style_build()!!!")
