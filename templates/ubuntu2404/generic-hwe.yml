@@ -1,4 +1,50 @@
-flavour: generic
+distro: ubuntu2404
+style: deb
+flavour: swaphints
+orig_flavour: generic
+search_pkg: linux-image-unsigned-*-generic
+version_ref_pkg: linux-image-unsigned
 metapkgs:
-  linux-image-generic-hwe-24.04:
-  linux-generic-hwe-24.04:
+  - orig_pkg_name: linux-headers-generic-hwe-24.04
+    pkg_name: linux-headers-swaphints
+    jinja_template: |
+      Package: {{ Package }}
+      Architecture: {{ Architecture }}
+      Version: {{ Version }}
+      Priority: optional
+      Section: kernel
+      Origin: BitFlux
+      Maintainer: {{ Maintainer }}
+      Depends: {{ Depends }}
+      Description-en: Swaphints Linux kernel headers. This package will always depend on the latest swaphints kernel headers available.
+  - orig_pkg_name: linux-image-generic-hwe-24.04
+    pkg_name: linux-image-swaphints
+    overrides:
+      - pattern: ^linux-image-\d+
+        original: linux-image
+        replacement: linux-image-unsigned
+    jinja_template: |
+      Package: {{ Package }}
+      Architecture: {{ Architecture }}
+      Version: {{ Version }}
+      Priority: optional
+      Section: kernel
+      Origin: BitFlux
+      Maintainer: {{ Maintainer }}
+      Provides: {{ Provides }}
+      Depends: {{ Depends }}
+      Description-en: Swaphints Linux kernel image. This package will always depend on the latest swaphints kernel image available.
+  - orig_pkg_name: linux-generic-hwe-24.04
+    pkg_name: linux-swaphints
+    jinja_template: |
+      Package: {{ Package }}
+      Architecture: {{ Architecture }}
+      Version: {{ Version }}
+      Priority: optional
+      Section: kernel
+      Origin: BitFlux
+      Maintainer: {{ Maintainer }}
+      Provides: {{ Provides }}
+      Depends: {{ Depends }}
+      Recommends: {{ Recommends }}
+      Description-en: Complete Swaphints Linux kernel and headers. This package will always depend on the latest complete swaphints Linux kernel and headers.
