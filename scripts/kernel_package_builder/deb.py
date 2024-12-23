@@ -443,7 +443,7 @@ def build_meta_pkg(metapkg_config, maintainer, versionnumber, arch, flavour, ori
     with open(f"{builddir}/{pkg_name}", "w") as f:
         f.write(templateoutput)
     # Actually make metapkg
-    run_cmd(f"equivs-build {metapkg_template}", workingdir=builddir, allow_errors=allow_errors, verbose=verbose, no_stdout=True)
+    run_cmd(f"equivs-build {pkg_name}", workingdir=builddir, allow_errors=allow_errors, verbose=verbose, no_stdout=True)
     # Rename the metapkg to something easier to deal with
     os.rename(f"{builddir}/{pkg_name}", f"{builddir}/{pkg_name}.template")
 
