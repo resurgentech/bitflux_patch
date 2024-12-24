@@ -1,8 +1,14 @@
-/build
+/build/
+/tmp/
+/output/
+
 /.idea/
 __pycache__
+
+.env
+*.log
+
 /artifactory.json
-/output
 /machines
 machines.yaml
 package.yaml
