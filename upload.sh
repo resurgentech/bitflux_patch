@@ -121,12 +121,14 @@ for COMMAND in "${COMMANDS[@]}"; do
       ;;
     upload)
       echo "  Uploading..."
-      upload_to_aptly "$APTLY_REPO_NAME"
+      # tore minio S3
       ftimestamp=$(find output/ -type f -printf '%TY-%Tm-%Td_%TH-%TM-%TS\n' | sort | head -n 1)
       upload_to_minio "$APTLY_REPO_NAME" "./output/" "${MINIO_BUCKET}/${ftimestamp}/"
       if [ -f "./build.log" ]; then
         upload_to_minio "$APTLY_REPO_NAME" "./build.log" "${MINIO_BUCKET}/${ftimestamp}/"
       fi
+      # upload to aptly
+      upload_to_aptly "$APTLY_REPO_NAME"
       ;;
     publish)
       echo "  Publish..."
