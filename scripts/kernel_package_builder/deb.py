@@ -453,7 +453,7 @@ def build_meta_pkg(metapkg_config, maintainer, versionnumber, arch, flavour, ori
     for line in output.splitlines():
         # Find the line where we announce the deb name first
         if f"building package '{pkg_name}'" in line and " in " in line:
-            deb_file = line.split(" in ")[1].strip()
+            deb_file = line.split(" in ")[1].strip().lstrip("'").rstrip("'.")
             deb_basename = os.path.basename(deb_file)
             print(f"1 '{deb_file}' '{deb_basename}'")
         # Now we detect when we're gonna put the deb file in the current dir
