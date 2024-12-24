@@ -76,8 +76,6 @@ upload_to_minio() {
   local srcpath=$2
   local dstpath=$3
 
-  #reponame=$(echo "$reponame" | sed s/_/-/g)
-
   # Copy files or paths
   run_command "mc cp --recursive ${srcpath} ${MINIO_ALIAS}/${MINIO_BUCKET}/${reponame}/${dstpath}"
 }
@@ -123,7 +121,7 @@ for COMMAND in "${COMMANDS[@]}"; do
       ;;
     upload)
       echo "  Uploading..."
-      #upload_to_aptly "$APTLY_REPO_NAME"
+      upload_to_aptly "$APTLY_REPO_NAME"
       ftimestamp=$(find output/ -type f -printf '%TY-%Tm-%Td_%TH-%TM-%TS\n' | sort | head -n 1)
       upload_to_minio "$APTLY_REPO_NAME" "./output/" "${MINIO_BUCKET}/${ftimestamp}/"
       if [ -f "./build.log" ]; then
