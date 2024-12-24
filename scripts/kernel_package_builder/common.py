@@ -275,8 +275,8 @@ def get_envars(var, filename='.env'):
     """
 
     # We have the var in the env use it
-    if sys.environment.get(var, False):
-        return sys.environment.get(var)
+    if os.environ.get(var, False):
+        return os.environ.get(var)
 
     # Get envars
     output = None
