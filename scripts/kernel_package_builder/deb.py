@@ -453,22 +453,29 @@ def build_meta_pkg(metapkg_config, maintainer, versionnumber, arch, flavour, ori
     for line in output.splitlines():
         # Find the line where we announce the deb name first
         if f"building package '{pkg_name}'" in line and " in " in line:
-            deb_file = line.split(" in ")[1].strip().strip("'.")
+            deb_file = line.split(" in ")[1].strip()
+            deb_basename = os.path.basename(deb_file)
+            print(f"1 '{deb_file}' '{deb_basename}'")
         # Now we detect when we're gonna put the deb file in the current dir
         #  and fix up the path
         elif "Attention, the package has been created in the current directory" in line:
-            deb_file = os.path.join(".", os.path.basename(deb_file))
+            deb_file = os.path.join(builddir, deb_basename)
+            print(f"2 {deb_file}")
         # Find the case where we pick another path, such as TMPDIR
         elif "Attention, the package has been created in the" in line:
             alt_dir = line.split("created in the ")[1].strip()
-            alt_dir = line.split("directory")[0].strip()
-            deb_file = os.path.join(alt_dir, os.path.basename(deb_file))
+            print(f"3a {alt_dir}")
+            alt_dir = alt_dir.split("directory")[0].strip()
+            print(f"3b {alt_dir}")
+            deb_file = os.path.join(alt_dir, deb_basename)
+            print(f"3c {deb_file}")
 
     # if we can't find the deb_file error out.
     if os.path.exists(deb_file):
         print(f"Found deb file: {deb_file}")
     else:
-        raise BaseException("Failed to find deb file")
+        print(output)
+        raise BaseException(f"Failed to find deb file '{deb_file}'")
 
     # Rename the metapkg to something easier to deal with
     os.rename(f"{builddir}/{pkg_name}", f"{builddir}/{pkg_name}.template")
