@@ -81,6 +81,8 @@ class KernelBuilder:
         for k,v in self.config['settings'].items():
             if v is True:
                 cmd += " --{}".format(k)
+            elif v is False:
+                continue
             else:
                 if isinstance(v, str):
                     cmd += " --{} {}".format(k,v)
@@ -176,10 +178,10 @@ def fill_configs(args):
 
     # These settings get passed to build_kernel_package.py
     config['settings'] = {}
-    for arg in dargs:
-        if arg in ['dumpall', 'nopull', 'nodocker']:
+    for arg, value in dargs.items():
+        if arg in ['dumpall', 'nopull', 'nodocker', 'docker_image']:
             continue
-        config['settings'][arg] = dargs[arg]
+        config['settings'][arg] = value
 
     # Set up docker image
     config['docker_image'] = args.docker_image
@@ -201,7 +203,6 @@ if __name__ == '__main__':
 
     # .deb specifics
     parser.add_argument('--distro_config', help='Distro build settings', default='./templates/ubuntu2404/generic-hwe.yml', type=str)
-    parser.add_argument('--maintainer', help='Maintainer line', default='unknown <unknown@unknown.unknown>', type=str)
 
     # DEBUG specifics
     parser.add_argument('--verbose', help='Verbose mode - DEBUG', action='store_true')

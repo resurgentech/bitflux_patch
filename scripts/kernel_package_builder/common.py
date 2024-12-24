@@ -267,3 +267,33 @@ def pretty_time_delta(seconds):
         parts.append(f"{seconds}s")
 
     return " ".join(parts)
+
+
+def get_envars(var, filename='.env'):
+    """
+    Get environment variables from a file or override from environment
+    """
+
+    # We have the var in the env use it
+    if sys.environment.get(var, False):
+        return sys.environment.get(var)
+
+    # Get envars
+    output = None
+    if not os.path.exists(filename):
+        return output
+    with open(filename) as f:
+        lines = f.readlines()
+    for line in lines:
+        if var not in line:
+            continue
+        for e in line.split():
+            if not e.startswith(var):
+                continue
+            if "=" not in e:
+                continue
+            if len(e.split("=")) > 1:
+                continue
+            output = e.split("=")[1]
+    return output
+

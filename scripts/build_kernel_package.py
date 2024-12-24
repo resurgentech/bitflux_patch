@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
     # For Distro settings
     parser.add_argument('--distro_config', help='Distro build settings', default='./templates/ubuntu2404/generic-hwe.yml', type=str)
-    parser.add_argument('--maintainer', help='Maintainer line', default='unknown <unknown@unknown.unknown>', type=str)
+    #parser.add_argument('--maintainer', help='Maintainer line', default='unknown <unknown@unknown.unknown>', type=str)
 
     # Overrides and special options
     parser.add_argument('--nobuild', help='Don\'t build', action='store_true')
@@ -29,6 +29,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     print_args(args, __file__)
+
+    # Get the maintainer from the .env file or environment
+    maintainer = get_envars("MAINTAINER", ".env")
+    if maintainer is None:
+        maintainer = "unknown <unknown@unknown.unknown>"
 
     if args.build_type == 'file':
         if args.kernel_version is None:
