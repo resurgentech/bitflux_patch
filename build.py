@@ -150,30 +150,35 @@ def fill_configs(args):
     dargs = vars(args)
     orig_args = json.loads(json.dumps(dargs, indent=4))
 
+    # Get the config file from the command line
     config = {}
     config['basedir'] = os.path.join(os.path.dirname(os.path.realpath(__file__)))
     config['container_name'] = args.jobname
     config['image_name'] = "resurgentech_local/{}:latest".format(args.jobname)
 
-    for arg in ['verbose', 'dumpall', 'nopull', 'nodocker', 'distro']:
+    # managing docker_image is a bit tricky.
+    # It can be in the distro_config file, overridden in the cli, or might be unnecessary if --nodocker
+    config_path = dargs.get('distro_config', 'unknown')
+    if not os.path.exists(config_path):
+        raise Exception("Config file {} does not exist".format(config_path))
+    with open(config_path, 'r') as f:
+        dconfig = yaml.safe_load(f)
+    if dargs.get('docker_image', False):
+        config['docker_image'] = dargs['docker_image']
+    elif dconfig.get('docker_image', False):
+        config['docker_image'] = dconfig['docker_image']
+    elif dargs.get('nodocker', False):
+        raise Exception("You must specify a docker image to use as --docker_image or --distro_config file.")
+
+    # These settings are for the local building state
+    for arg in ['verbose', 'dumpall', 'nopull', 'nodocker']:
         config[arg] = dargs[arg]
 
-    ## Settings gets passed on to next level
-    # 3) Make a 'settings' dict from the commandline options
+    # These settings get passed to build_kernel_package.py
     config['settings'] = {}
-    for arg in ['distro_config']:
+    for arg not in [, 'dumpall', 'nopull', 'nodocker']:
         if dargs.get(arg, False):
             config['settings'][arg] = dargs[arg]
-
-    for arg in ['build_type', 'kernel_version']:
-        if dargs.get(arg, False):
-            if not config['settings'].get(arg, False):
-                config['settings'][arg] = dargs[arg]
-
-    for arg in ['clean', 'nobuild', 'buildnumber', 'rebuild', 'nopatch']:
-        if dargs.get(arg, False):
-            config['settings'][arg] = dargs[arg]
-
 
     # Set up docker image
     config['docker_image'] = args.docker_image
@@ -185,21 +190,17 @@ def fill_configs(args):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--distro', help='Linux distro', default="ubuntu2404", type=str)
     parser.add_argument('--buildnumber', help='Adds to package name to increment it', default="11", type=str)
     parser.add_argument('--kernel_version', help='kernel version', type=str)
     parser.add_argument('--build_type', help='Hacks for patching and building test [distro, file, git, gitminimal]', default='distro', type=str)
     parser.add_argument('--jobname', help='Helpful in tracking jobs from jenkins', default="aaaaaa", type=str)
-    parser.add_argument('--docker_image', help='Docker image to build kernel', default="resurgentech/kernel_build-ubuntu2004:latest", type=str)
     parser.add_argument('--nodocker', help="Don't run in Docker", action='store_true')
     parser.add_argument('--checkonly', help='Return the kernel package name', action='store_true')
+    parser.add_argument('--docker_image', help='Docker image to build kernel', type=str)
 
     # .deb specifics
     parser.add_argument('--distro_config', help='Distro build settings', default='./templates/ubuntu2404/generic-hwe.yml', type=str)
     parser.add_argument('--maintainer', help='Maintainer line', default='unknown <unknown@unknown.unknown>', type=str)
-
-    # Allow for in cli complex options
-    #parser.add_argument('--settings', help='Overrides for building in escaped json', type=str)
 
     # DEBUG specifics
     parser.add_argument('--verbose', help='Verbose mode - DEBUG', action='store_true')

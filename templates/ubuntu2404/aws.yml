@@ -1,4 +1,5 @@
 distro: ubuntu2404
+docker_image: resurgentech/kernel_build-ubuntu2404:latest
 style: deb
 flavour: awsswaphints
 orig_flavour: aws
