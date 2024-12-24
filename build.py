@@ -179,7 +179,7 @@ def fill_configs(args):
     # These settings get passed to build_kernel_package.py
     config['settings'] = {}
     for arg, value in dargs.items():
-        if arg in ['dumpall', 'nopull', 'nodocker', 'docker_image']:
+        if arg in ['dumpall', 'nopull', 'nodocker', 'docker_image', 'jobname']:
             continue
         config['settings'][arg] = value
 
