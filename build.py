@@ -176,9 +176,10 @@ def fill_configs(args):
 
     # These settings get passed to build_kernel_package.py
     config['settings'] = {}
-    for arg not in [, 'dumpall', 'nopull', 'nodocker']:
-        if dargs.get(arg, False):
-            config['settings'][arg] = dargs[arg]
+    for arg in dargs:
+        if arg in ['dumpall', 'nopull', 'nodocker']:
+            continue
+        config['settings'][arg] = dargs[arg]
 
     # Set up docker image
     config['docker_image'] = args.docker_image
