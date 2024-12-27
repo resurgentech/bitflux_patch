@@ -23,13 +23,12 @@ VALID_COMMANDS=("clean:Delete aptly repo"
                 "publish:Publish from repo to s3"
                 "help:Show help for TARGET")
 VALID_FLAGS=("--help|-h:Show help for this script"
-               "--debug:Enable debug mode"
-               "--dryrun:Dryrun.  Don't actually run the commands"
-               "--verbose:Verbose output")
+             "--debug:Enable debug mode"
+             "--dryrun:Dryrun.  Don't actually run the commands"
+             "--verbose:Verbose output")
 VALID_OPTIONS=("--reponame=<str>:generate:Repository name in Aptly"
                "--reponame=<str>:upload:Repository name in Aptly"
                "--reponame=<str>:publish:Repository name in Aptly"
-               "--dest=<str>:upload:Push to this "
                "--prefix=<str>:publish:Prefix for repo publish target"
                "--gpg_passphrase=<str>:publish:GPG passphrase for signing on publish"
                "--distro=<str>:generate:Distribution for repo")
@@ -69,7 +68,7 @@ publish_from_aptly() {
   local reponame=$1
   local repoprefix=$2
   local aptly_gpg_passphrase=$3
-  run_command "aptly-cli publish_repo --sourcekind local --name ${reponame} --prefix ${repoprefix} --forceoverwrite --gpg_passphrase ${aptly_gpg_passphrase} --gpg_batch"
+  run_command "aptly-cli publish_repo --sourcekind local --name ${reponame} --prefix ${repoprefix}${reponame} --forceoverwrite --gpg_passphrase ${aptly_gpg_passphrase} --gpg_batch"
 }
 
 upload_to_minio() {
@@ -113,21 +112,24 @@ make_foldername() {
   echo "$ftimestamp.$buildnumber.$githash"
 }
 
+# Pull in environment variables from .env file
 source $SCRIPT_DIR/.env
 
+# Override variables from the command line
 if [ -n "$(get_option_value '--reponame')" ]; then
   APTLY_REPO_NAME="$(get_option_value '--reponame')"
 fi
-
 if [ -n "$(get_option_value '--prefix')" ]; then
-  APTLY_CONFIG_FILE="$(get_option_value '--prefix')"
+  APTLY_REPO_PREFIX="$(get_option_value '--prefix')"
+fi
+if [ -n "$(get_option_value '--gpg_passphrase')" ]; then
+  APTLY_GPG_PASSPHRASE="$(get_option_value '--gpg_passphrase')"
+fi
+if [ -n "$(get_option_value '--distro')" ]; then
+  APTLY_DISTRIBUTION="$(get_option_value '--distro')"
 fi
 
-if [ -n "$(get_option_value '--reponame')" ]; then
-  APTLY_REPO_NAME="$(get_option_value '--reponame')"
-fi
-
-#
+# All the commands require a repo name
 if [ -z "$APTLY_REPO_NAME" ]; then
   echo "Missing APTLY_REPO_NAME envar"
   exit 1
@@ -150,6 +152,10 @@ for COMMAND in "${COMMANDS[@]}"; do
       ;;
     generate)
       echo "  Generating..."
+      if [ -z "$APTLY_DISTRIBUTION" ]; then
+        echo "Missing APTLY_DISTRIBUTION envar"
+        exit 1
+      fi
       run_command "aptly-cli repo_create --name ${APTLY_REPO_NAME} --default_distribution ${APTLY_DISTRIBUTION}"
       ;;
     upload)
