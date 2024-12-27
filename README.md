@@ -84,20 +84,24 @@ Contains config and scripts to make and config vms.
 - **teardown.sh** - `./scripts/vagrant/teardown.sh centos8`  will destroy the vm created with setup.sh.
 
 
+# ./upload.sh
+This script uploads the kernel packages to aptly, to a lab local minio, and can publish from aptly to public S3.
 
+
+# TODO: add this to ansible for dealing with mirrors
 git config --global --add safe.directory /opt/mirrors/linux-stable.git
 
-./build.py --nodocker --build_type distro --distro ubuntu2404 --search_pkg linux-image-unsigned-*-generic
+# TODO: rust adds a new wrinkle
+# if we call this script with rustc or whatever it returns the min version
+scripts/min-tool-version.sh
+# we can us that version to install a compatible version of the rust tools as follows:
 rustup install 1.75.0
 rustup override set 1.75.0
 rustup component add rust-src
 
-scripts/min-tool-version.sh
 
+# TODO: behavoir sucks right now.
 huh.  swapcache is high.  IS there an issue with refcount?  Am I not freeing something?
 Make memhog madvise itself. see what that does.
 
-./build.py --nodocker --build_type distro --distro ubuntu2404 --search_pkg linux-image-unsigned-*-generic
-TMPDIR=$(pwd)/tmp ./build.py --nodocker --build_type distro --distro ubuntu2404 --search_pkg linux-image-unsigned-*-aws
-
-TMPDIR=$(pwd)/tmp ./build.py --nodocker --build_type distro --distro ubuntu2404 --orig_flavour aws --flavour swaphints
+ sudo rm -rf build; sudo rm build.log; TMPDIR=$(pwd)/tmp ./build.py --nodocker --distro_config ./templates/ubuntu2404/generic-hwe.yml --buildnumber 12 | tee build.log

@@ -19,6 +19,7 @@ SHORT_DESC="testing"
 VALID_COMMANDS=("clean:Delete aptly repo"
                 "generate:Set up aptly repo"
                 "upload:Upload files to repo"
+                "push:Copy file to local minio"
                 "publish:Publish from repo to s3"
                 "help:Show help for TARGET")
 VALID_FLAGS=("--help|-h:Show help for this script"
@@ -76,8 +77,40 @@ upload_to_minio() {
   local srcpath=$2
   local dstpath=$3
 
+  if [ -z "${MINIO_BUCKET}" ]; then
+   echo "MINIO_BUCKET needs to be set in .env file or the environment"
+   FAILED="true"
+  fi
+  if [ -z "${MINIO_ALIAS}" ]; then
+    echo "MINIO_ALIAS needs to be set in .env file or the environment"
+    FAILED="true"
+  fi
+  if [ -n "$FAILED" ]; then
+    exit 1
+  fi
+  
   # Copy files or paths
   run_command "mc cp --recursive ${srcpath} ${MINIO_ALIAS}/${MINIO_BUCKET}/${reponame}/${dstpath}"
+}
+
+make_foldername() {
+  # Let's start with a simple timestamp
+  ftimestamp=$(find output/ -type f -printf '%TY%Tm%Td-%TH%TM%TS\n' | sort | head -n 1 | cut -d'.' -f1)
+  # Try to isolate the build number
+  buildnumber=$(ls output/*.deb | head -n 1 | awk -F'+bitflux' '{print $1}' | awk -F'.' '{print $NF}')
+  # test if buildnumber is a number
+  if [[ ! $buildnumber =~ ^[0-9]+$ ]]; then
+    echo $ftimestamp
+    return
+  fi
+  # lets get the git hash
+  githash=$(ls output/*.deb | head -n 1 | awk -F'+bitflux' '{print $2}' | cut -d'.' -f1 | cut -d'_' -f1)
+  # test if githash is a proper hex number
+  if [[ ! $githash =~ ^[0-9a-fA-F]+$ ]]; then
+    echo "$ftimestamp.$buildnumber"
+    return
+  fi
+  echo "$ftimestamp.$buildnumber.$githash"
 }
 
 source $SCRIPT_DIR/.env
@@ -121,14 +154,17 @@ for COMMAND in "${COMMANDS[@]}"; do
       ;;
     upload)
       echo "  Uploading..."
-      # tore minio S3
-      ftimestamp=$(find output/ -type f -printf '%TY-%Tm-%Td_%TH-%TM-%TS\n' | sort | head -n 1)
-      upload_to_minio "$APTLY_REPO_NAME" "./output/" "${MINIO_BUCKET}/${ftimestamp}/"
-      if [ -f "./build.log" ]; then
-        upload_to_minio "$APTLY_REPO_NAME" "./build.log" "${MINIO_BUCKET}/${ftimestamp}/"
-      fi
       # upload to aptly
       upload_to_aptly "$APTLY_REPO_NAME"
+      ;;
+    push)
+      echo "  Pushing..."
+      # store build artifacts to minio S3
+      fname=$(make_foldername)
+      upload_to_minio "$APTLY_REPO_NAME" "./output/" "${fname}/"
+      if [ -f "./build.log" ]; then
+        upload_to_minio "$APTLY_REPO_NAME" "./build.log" "${fname}/"
+      fi
       ;;
     publish)
       echo "  Publish..."
