@@ -167,7 +167,7 @@ for COMMAND in "${COMMANDS[@]}"; do
       echo "  Pushing..."
       # store build artifacts to minio S3
       fname=$(make_foldername)
-      buildtype=$(ls output/*.deb | cut -d'_' -f1 | awk -F 'output/' '{print $2}'| grep -E "^linux-[a-z]+$")
+      buildtype=$(ls output/*.deb | cut -d'_' -f1 | awk -F 'output/' '{print $2}'| grep -v linux-doc | grep -E "^linux-[a-z]+$")
       if [ -z "$buildtype" ]; then
         buildtype="unknown"
       fi
