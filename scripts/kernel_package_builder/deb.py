@@ -405,6 +405,10 @@ def build_meta_pkg(metapkg_config, maintainer, versionnumber, arch, flavour, ori
         print("```")
         sys.exit(1)
 
+    # fetch the original version number
+    orig_version = ".".join(versionnumber.split("+")[0].split(".")[:-1])
+    overrides.append({'pattern': f"(= {orig_version})", 'original': f"(= {orig_version})", 'replacement': f"(= {versionnumber})"})
+
     template_content = metapkg_config['jinja_template']
     pkg_name = metapkg_config['pkg_name']
     orig_pkg_name = metapkg_config['orig_pkg_name']

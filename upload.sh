@@ -16,7 +16,8 @@ SHORT_DESC="testing"
 ############################################################################################
 
 # These lists will be parsed and used for the help output and validation
-VALID_COMMANDS=("clean:Delete aptly repo"
+VALID_COMMANDS=("distclean:Delete aptly repo"
+                "clean:unpublish repo"
                 "generate:Set up aptly repo"
                 "upload:Upload files to repo"
                 "push:Copy file to local minio"
@@ -161,6 +162,11 @@ for COMMAND in "${COMMANDS[@]}"; do
   case "$COMMAND" in
     clean)
       echo "  Cleaning..."
+      run_command "aptly-cli publish_drop --distribution ${APTLY_DISTRIBUTION} --prefix  "${APTLY_REPO_PREFIX}${APTLY_REPO_NAME}" --force"
+      ;;
+    distclean)
+      echo "  Distcleaning..."
+      run_command "aptly-cli publish_drop --distribution ${APTLY_DISTRIBUTION} --prefix  "${APTLY_REPO_PREFIX}${APTLY_REPO_NAME}" --force"
       run_command "aptly-cli repo_delete --name ${APTLY_REPO_NAME}"
       ;;
     generate)
