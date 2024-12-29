@@ -69,6 +69,19 @@ publish_from_aptly() {
   local repoprefix=$2
   local aptly_gpg_passphrase=$3
   run_command "aptly-cli publish_repo --sourcekind local --name ${reponame} --prefix ${repoprefix}${reponame} --forceoverwrite --gpg_passphrase ${aptly_gpg_passphrase} --gpg_batch"
+  if [ "$?" == "0" ]; then
+    echo ""
+    echo "Published successfully!"
+    return
+  fi
+  echo ""
+  echo "No worries!, we will try to update instead... "
+  # Failed to publish try to update instead
+  run_command "aptly-cli publish_update --distribution ${APTLY_DISTRIBUTION} --prefix ${repoprefix}${reponame} --forceoverwrite --gpg_passphrase ${aptly_gpg_passphrase} --gpg_batch"
+  if [ "$?" == "0" ]; then
+    echo ""
+    echo "Published successfully!"
+  fi
 }
 
 upload_to_minio() {

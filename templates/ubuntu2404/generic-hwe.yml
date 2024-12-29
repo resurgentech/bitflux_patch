@@ -7,7 +7,7 @@ search_pkg: linux-image-unsigned-*-generic
 version_ref_pkg: linux-image-unsigned
 metapkgs:
   - orig_pkg_name: linux-headers-generic-hwe-24.04
-    pkg_name: linux-headers-swaphints
+    pkg_name: linux-headers-swaphints-hwe-24.04
     jinja_template: |
       Package: {{ Package }}
       Architecture: {{ Architecture }}
@@ -19,7 +19,7 @@ metapkgs:
       Depends: {{ Depends }}
       Description-en: Swaphints Linux kernel headers. This package will always depend on the latest swaphints kernel headers available.
   - orig_pkg_name: linux-image-generic-hwe-24.04
-    pkg_name: linux-image-swaphints
+    pkg_name: linux-image-swaphints-hwe-24.04
     overrides:
       - pattern: ^linux-image-\d+
         original: linux-image
