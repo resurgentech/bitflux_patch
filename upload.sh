@@ -87,7 +87,7 @@ upload_to_minio() {
   if [ -n "$FAILED" ]; then
     exit 1
   fi
-  
+
   # Copy files or paths
   run_command "mc cp --recursive ${srcpath} ${MINIO_ALIAS}/${MINIO_BUCKET}/${reponame}/${dstpath}"
 }
@@ -167,9 +167,13 @@ for COMMAND in "${COMMANDS[@]}"; do
       echo "  Pushing..."
       # store build artifacts to minio S3
       fname=$(make_foldername)
-      upload_to_minio "$APTLY_REPO_NAME" "./output/" "${fname}/"
+      buildtype=$(ls output/*.deb | cut -d'_' -f1 | awk -F 'output/' '{print $2}'| grep -E "^linux-[a-z]+$")
+      if [ -z "$buildtype" ]; then
+        buildtype="unknown"
+      fi
+      upload_to_minio "$APTLY_REPO_NAME" "./output/" "${buildtype}/${fname}/"
       if [ -f "./build.log" ]; then
-        upload_to_minio "$APTLY_REPO_NAME" "./build.log" "${fname}/"
+        upload_to_minio "$APTLY_REPO_NAME" "./build.log" "${buildtype}/${fname}/"
       fi
       ;;
     publish)
