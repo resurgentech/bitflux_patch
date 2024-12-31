@@ -364,7 +364,7 @@ def update_list_with_orig_flavour(key, orig_pkg, flavour, orig_flavour, builddir
             # Processing overrides if any
             for override in overrides:
                 p = re.compile(override['pattern'])
-                if p.match(fixed_e):
+                if p.search(fixed_e):
                     fixed_e = fixed_e.replace(override['original'], override['replacement'])
             fixedelements.append(fixed_e)
             # looking for matching files
@@ -405,14 +405,15 @@ def build_meta_pkg(metapkg_config, maintainer, versionnumber, arch, flavour, ori
         print("```")
         sys.exit(1)
 
-    # fetch the original version number
-    orig_version = ".".join(versionnumber.split("+")[0].split(".")[:-1])
-    overrides.append({'pattern': f"(= {orig_version})", 'original': f"(= {orig_version})", 'replacement': f"(= {versionnumber})"})
-
     template_content = metapkg_config['jinja_template']
     pkg_name = metapkg_config['pkg_name']
     orig_pkg_name = metapkg_config['orig_pkg_name']
     overrides = metapkg_config.get('overrides', [])
+
+    # fetch the original version number
+    orig_version = ".".join(versionnumber.split("+")[0].split(".")[:-1])
+    pattern = re.escape(f"(= {orig_version})")
+    overrides.append({'pattern': pattern, 'original': f"(= {orig_version})", 'replacement': f"(= {versionnumber})"})
 
     printfancy(f"Building {pkg_name}")
 
@@ -459,20 +460,15 @@ def build_meta_pkg(metapkg_config, maintainer, versionnumber, arch, flavour, ori
         if f"building package '{pkg_name}'" in line and " in " in line:
             deb_file = line.split(" in ")[1].strip().lstrip("'").rstrip("'.")
             deb_basename = os.path.basename(deb_file)
-            print(f"1 '{deb_file}' '{deb_basename}'")
         # Now we detect when we're gonna put the deb file in the current dir
         #  and fix up the path
         elif "Attention, the package has been created in the current directory" in line:
             deb_file = os.path.join(builddir, deb_basename)
-            print(f"2 {deb_file}")
         # Find the case where we pick another path, such as TMPDIR
         elif "Attention, the package has been created in the" in line:
             alt_dir = line.split("created in the ")[1].strip()
-            print(f"3a {alt_dir}")
             alt_dir = alt_dir.split("directory")[0].strip()
-            print(f"3b {alt_dir}")
             deb_file = os.path.join(alt_dir, deb_basename)
-            print(f"3c {deb_file}")
 
     # if we can't find the deb_file error out.
     if os.path.exists(deb_file):
