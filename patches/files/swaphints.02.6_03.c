@@ -144,10 +144,9 @@ int status_max_len = 1<<21;
 module_param(status_max_len, int, 0660);
 
 /**
- * Length of ring buffer for stashing status of pfn
- * MUST BE power of 2 or the math doesn't work in our buffer logic.
+ * How many times do we retry reclaim before giving up?
  */
-int reclaim_retries = 12;
+int reclaim_retries = 4;
 module_param(reclaim_retries, int, 0660);
 
 #ifdef SWAPHINT_DEBUG
@@ -365,9 +364,8 @@ static int swaphints_swap_the_pagelist(void)
 		pfn = swaphints_pfn_list.pfns[i];
 		for (j = 0; j < reclaim_retries; j++) {
 			status = swaphints_swap_a_page(pfn);
-			swaphint_print_status(pfn, status);
-			//if (status != 0)
-			//	break;
+			if (debug)
+				swaphint_print_status(pfn, status);
 		}
 		/**
 		 * Log status of each swap
