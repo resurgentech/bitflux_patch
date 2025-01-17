@@ -1,0 +1,15 @@
+#!/bin/bash
+
+
+mkdir -p tmp
+mkdir -p build
+sudo umount build
+sudo umount tmp
+sudo mount -t tmpfs tmpfs build
+sudo mount -t tmpfs tmpfs tmp
+
+sudo rm build.log;
+TMPDIR=$(pwd)/tmp ./build.py --nodocker --distro_config ./templates/ubuntu2404/$1.yml --buildnumber $2 | tee build.log
+
+#generic-hwe
+#aws

@@ -100,8 +100,34 @@ rustup override set 1.75.0
 rustup component add rust-src
 
 
-# TODO: behavoir sucks right now.
-huh.  swapcache is high.  IS there an issue with refcount?  Am I not freeing something?
-Make memhog madvise itself. see what that does.
+# Uploading
+Uploading is a bear.
+There are three moving parts to this. aptly locally hosted, minio, and s3.
 
- sudo rm -rf build; sudo rm build.log; TMPDIR=$(pwd)/tmp ./build.py --nodocker --distro_config ./templates/ubuntu2404/generic-hwe.yml --buildnumber 12 | tee build.log
+### First, you need to have a repo generated.
+`./upload.sh generate`
+This interacts with aptly to create a repo.
+
+### Second, you need to upload the packages.
+`./upload.sh upload`
+This adds the packages to the aptly repo but does not publish them.  Not sure how they are stored at this state, but they are locally saved in the aptly containers data directory.
+
+### Third, you need to publish the repo.
+`./upload.sh publish`
+This publishes the aptly repo to minio.  Basically it copies the aptly repo to the minio server, with the manifests and files in the right structure.
+
+### Fourth, you need to sync the repo to s3 from minio.
+Right now this is a seperate script.
+This uses the mc cli to sync the minio repo to s3.
+s3 is set up to be web accessible so that you can just point to that as your repo.
+
+## Problems
+
+* s3 is stupid slow like upload is 1MB/s as some point.
+* aptly publishing to the s3 times out.  That's why we go to the minio.
+* aptly forgets to publish to minio sometimes.  I'm not sure why.  workaround is to restart aptly container and try again.
+
+## TODO:
+* 3 level. aptly local, aptly mirror to minio, sync s3
+* aptly to local, webscrape to minio, sync to s3
+* script to confirm that the files are published to minio
