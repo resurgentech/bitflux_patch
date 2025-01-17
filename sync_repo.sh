@@ -7,16 +7,14 @@ export AWS_PROFILE=jared
 # So we first have to sync just these AWS to minio, then we can
 # lazyly mirror everything from minio to AWS
 LIST_OF_FILES=("repo_signing.key"
+               "ubuntu_installer.sh"
                "error.html"
                "index.html")
 
 for FILE in "${LIST_OF_FILES[@]}"; do
-    mc stat sdf1/apt.bitflux.ai/$FILE
-    if [ $? -ne 0 ]; then
-        aws s3 cp s3://apt.bitflux.ai/$FILE /tmp/$FILE
-        mc cp /tmp/$FILE sdf1/apt.bitflux.ai/$FILE
-        rm /tmp/$FILE
-    fi
+    aws s3 cp s3://apt.bitflux.ai/$FILE /tmp/$FILE
+    mc cp /tmp/$FILE sdf1/apt.bitflux.ai/$FILE
+    rm /tmp/$FILE
 done
 
 mc mirror sdf1/apt.bitflux.ai s3/apt.bitflux.ai --overwrite --retry --remove
