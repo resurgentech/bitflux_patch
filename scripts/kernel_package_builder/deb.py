@@ -236,6 +236,23 @@ def deb_set_flavour(flavour, orig_flavour, debian_dir, allow_errors=False, verbo
 
     for a in file_pair:
         duplicate_file(a[0], a[1], workingdir=debian_dir, verbose=verbose)
+        if a[1] == f"control.d/{flavour}.inclusion-list":
+            # we need to add fs/proc/ to the inclusion list for the swaphints.ko to be added to the modules deb
+            with open(os.path.join(debian_dir, a[1]), 'r') as file:
+                lines = file.readlines()
+            newlines = []
+            for i in range(len(lines)):
+                line = lines[i]
+                if line.startswith('fs/'):
+                    b = line.split('/')
+                    if b[1][0] > 'proc':
+                        newlines.append('fs/proc/*')
+                        continue
+                newlines.append(line)
+            if not 'fs/proc/*' in newlines:
+                raise BaseException("Missing 'fs/proc/*' in {}".format(a[1]))
+            with open(os.path.join(debian_dir, a[1]), 'w') as file:
+                file.write('\n'.join(newlines))
     sed_sets = [
         # We might not need this either...
         [f"amd64-{orig_flavour}", f"amd64-{flavour}", 'config/annotations'],
