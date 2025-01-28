@@ -249,7 +249,6 @@ def deb_set_flavour(flavour, orig_flavour, debian_dir, allow_errors=False, verbo
                 line = lines[i].strip()
                 if (not spliced) and line.startswith('fs/'):
                     b = line.split('/')
-                    print(f"b={b} {b[1][0] > 'proc'}")
                     if b[1][0] > 'proc':
                         newlines.append('fs/proc/*')
                         spliced = True
@@ -621,7 +620,6 @@ def debian_style_build(distro_config_path, buildnumber, maintainer, verbose, nob
     # Handle flavour hacking
     printfancy("Creating flavour swaphints config files")
     deb_set_flavour(flavour, orig_flavour, debian_dir, verbose=True)
-    raise
     commit_and_create_patch('flavour', src_dir, verbose=True)
 
     # Create the final patching
