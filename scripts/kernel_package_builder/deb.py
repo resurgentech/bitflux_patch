@@ -88,19 +88,7 @@ def apt_get_linux_image_name(search_pkg, allow_errors=False, verbose=False):
     fullimage = apt_get_package_stats(search_pkg, allow_errors=allow_errors, verbose=verbose)
     print("found image '{}'".format(fullimage))
 
-    if isinstance(fullimage["Depends"], list):
-        rawversion = fullimage["Depends"][0]
-    else:
-        rawversion = fullimage["Depends"]
-    if rawversion.find("linux-image") == -1:
-        print("did not find linux-image in '{}'".format(rawversion))
-        return fullimage['Package']
-
-    if rawversion.find("("):
-        image = rawversion.replace(" ", "").replace("(", "").replace(")", "")
-    else:
-        image = rawversion.split(" ")[0]
-    return image
+    return fullimage['Package'], fullimage['Version']
 
 
 def apt_get_source(image_name, allow_errors=False, verbose=False, builddir='./build'):
@@ -533,10 +521,10 @@ def get_package_deb(distro_config_path):
     sleep(3)
 
     # Return the newest latest linux kernel image package name
-    image_name = apt_get_linux_image_name(search_pkg, orig_flavour, verbose=False)
-    print("Found image name:           {}".format(image_name))
+    image_name, version_name = apt_get_linux_image_name(search_pkg, orig_flavour, verbose=False)
+    print("Found image name:           {} - ".format(image_name, version_name))
     sys.stdout.flush()
-    return image_name
+    return image_name, version_name
 
 
 def printfancy(str, timeout=0.1):
@@ -597,8 +585,8 @@ def debian_style_build(distro_config_path, buildnumber, maintainer, verbose, nob
     printfancy(f"Set bitflux_version:        {bitflux_version}", timeout=3)
 
     # Return the newest latest linux kernel image package name
-    image_name = apt_get_linux_image_name(search_pkg, orig_flavour, verbose=verbose)
-    printfancy(f"Found image name:           {image_name}")
+    image_name, version_name = apt_get_linux_image_name(search_pkg, orig_flavour, verbose=verbose)
+    printfancy(f"Found image name:           {image_name} - {version_name}")
 
     # Search patches for something that should match the kernel image package
     patches_dir = select_patches_dir(image_name, patches_root_dir='./patches')
@@ -638,6 +626,15 @@ def debian_style_build(distro_config_path, buildnumber, maintainer, verbose, nob
         deb_hack_abi_records('swaphints', debian_dir, verbose=verbose)
     except:
         print("Failed to mock out current abi files")
+
+    # Build deps are changing relatively often, so we need to update them
+    printfancy("Installing build dependencies")
+    run_cmd(f"sudo apt build-dep -y {image_name}", allow_errors=True, verbose=False)
+
+    # Rust tools are also changing relatively often, so we need to update them
+    #  ubuntu builds are depending on deb package conventions for rustc executable names
+    printfancy("Update rust tools")
+    update_rust_tools(src_dir, verbose=True)
 
     # Build deb packages
     if nobuild:

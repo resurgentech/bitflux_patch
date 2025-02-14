@@ -297,3 +297,30 @@ def get_envars(var, filename='.env'):
             output = e.split("=")[1]
     return output
 
+
+def update_rust_tools(src_dir, verbose=False):
+    """
+    With rust in the kernel the toolchain is still in flux, so we need to update it often
+    """
+    _, ver, _ = run_cmd("./scripts/min-tool-version.sh rustc", workingdir=src_dir, allow_errors=True, verbose=verbose)
+    if len(ver) < 1:
+        print("rustc requirement not found, skipping rustup")
+        return
+
+    altfile = os.path.join(src_dir, "debian.master/config/annotations")
+    #if this file exists then find the first line with the word rustc and get the version
+    # for reasons dumb beyond my ken min-tool-version.sh isn't the source of truth
+    if os.path.exists(altfile):
+        with open(altfile) as f:
+            lines = f.readlines()
+        for line in lines:
+            if "rustc" in line:
+                ver = line.split("rustc")[1]
+                ver = ver.split()[0]
+                break
+
+    _, out, _ = run_cmd(f"rustup show | grep ^{ver}", workingdir=src_dir, allow_errors=True, verbose=verbose)
+    if len(out) < 1:
+        ec, _, _ = run_cmd(f"rustup install {ver}", workingdir=src_dir, allow_errors=True, verbose=verbose)
+    run_cmd(f"rustup override set {ver}", workingdir=src_dir, allow_errors=True, verbose=verbose)
+    run_cmd("rustup component add rust-src", workingdir=src_dir, allow_errors=True, verbose=verbose)
