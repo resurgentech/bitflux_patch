@@ -77,6 +77,9 @@ def apt_get_package_stats(search_pkg, allow_errors=False, verbose=False):
 
     # sort list on sorthelper key
     sorted_image_list = sorted(image_list, key=debsrc_list_srt_func)
+    if verbose:
+        print(f"found {len(sorted_image_list)} images")
+
     fullimage = sorted_image_list[-1]
     return fullimage
 
@@ -86,9 +89,10 @@ def apt_get_linux_image_name(search_pkg, allow_errors=False, verbose=False):
     Return the newest latest linux kernel image package name
     """
     fullimage = apt_get_package_stats(search_pkg, allow_errors=allow_errors, verbose=verbose)
-    print("found image '{}'".format(fullimage))
+    if verbose:
+        print(json.dumps(fullimage, indent=4))
 
-    return fullimage['Package'], fullimage['Version']
+    return fullimage['Package'], fullimage['Version'], fullimage['Architecture']
 
 
 def apt_get_source(image_name, allow_errors=False, verbose=False, builddir='./build'):
@@ -152,19 +156,19 @@ def deb_hack_changelog(bitflux_version, src_dir, buildnum=None, verbose=True, cl
         with open(changelog_path, 'r') as file:
             original_contents_array = file.readlines()
         line = original_contents_array[0]
-        print("old changelog line from '{}' = '{}'".format(changelog_path, line))
-        m = re.search(r'\([0-9\.]+-([0-9\.]+)', line)
-        if not m:
-            continue
-        a = m.group(0)
-        line = line.replace(a, '{}.{}'.format(a, buildnum))
-        line = line.replace(')', '+{})'.format(bitflux_version))
-        if not m:
-            continue
-        a = m.group(0)
         if verbose:
-            print("new changelog line from '{}' = '{}'".format(changelog_path, line))
-        original_contents_array[0] = line
+            print("old changelog line from '{}' = '{}'".format(changelog_path, line))
+        a = line.split('(')
+        if len(a) < 2:
+            print("no match for (")
+            continue
+        newline = f"{a[0]}({bitflux_version})"
+        b = line.split(')')
+        if len(b) > 1:
+            newline += f"{b[1]}"
+        if verbose:
+            print("new changelog line from '{}' = '{}'".format(changelog_path, newline))
+        original_contents_array[0] = newline
         original_contents = "".join(original_contents_array)
         with open(changelog_path, 'w') as file:
             file.write(original_contents)
@@ -314,20 +318,6 @@ def build_debs(src_dir, allow_errors=False, verbose=False, live_output=True):
     run_cmd(cmd, workingdir=src_dir, allow_errors=allow_errors, verbose=verbose, live_output=live_output, no_stdout=True)
 
 
-def get_package_stats(version_ref_pkg, package_dir="./build"):
-    for (dirpath, dirnames, filenames) in os.walk(package_dir):
-        for filename in filenames:
-            subfilenames = filename.split("_", 1)
-            if version_ref_pkg in filename:
-                versionstr = subfilenames[1].split(".deb", 1)
-                versionchunks = versionstr[0].split("_", 1)
-                versionnumber = versionchunks[0]
-                architecture = versionchunks[1]
-                return versionnumber, architecture
-    print("Failure in get_package_version()")
-    print(f"  Could not find version_ref_pkg: {version_ref_pkg}")
-    exit(1)
-
 def render_jinja_template(template_content, data):
     template = jinja2.Template(template_content)
     parsed_content = template.environment.parse(template_content)
@@ -392,7 +382,16 @@ def update_list_with_orig_flavour(key, orig_pkg, flavour, orig_flavour, builddir
     return output
 
 
-def build_meta_pkg(metapkg_config, maintainer, versionnumber, arch, flavour, orig_flavour, builddir='./build', allow_errors=False, verbose=False, live_output=True):
+def get_new_version(orig_version, bitflux_version, buildnumber):
+    a = orig_version.split("+")
+    if len(a) > 2:
+        print(f"Error in get_new_version() a: too many + in version: {orig_version} a: {a}")
+        exit(1)
+    new_version = f"{a[0]}+{buildnumber}{bitflux_version}"
+    return new_version
+
+
+def build_meta_pkg(metapkg_config, maintainer, new_version, arch, flavour, orig_flavour, builddir='./build', allow_errors=False, verbose=False, live_output=True):
     """
     Builds a meta package that installs all other packages
     """
@@ -419,22 +418,24 @@ def build_meta_pkg(metapkg_config, maintainer, versionnumber, arch, flavour, ori
     pkg_name = metapkg_config['pkg_name']
     orig_pkg_name = metapkg_config['orig_pkg_name']
     overrides = metapkg_config.get('overrides', [])
-
-    # fetch the original version number
-    orig_version = ".".join(versionnumber.split("+")[0].split(".")[:-1])
-    pattern = re.escape(f"(= {orig_version})")
-    overrides.append({'pattern': pattern, 'original': f"(= {orig_version})", 'replacement': f"(= {versionnumber})"})
-
-    printfancy(f"Building {pkg_name}")
+    if verbose:
+        print(f"  -- metapkg_config ------------------------")
+        print(f"{json.dumps(metapkg_config, indent=2)}")
 
     # Get the package stats from apt-cache to get some info
     orig_pkg = apt_get_package_stats(orig_pkg_name, allow_errors=allow_errors, verbose=verbose)
+    orig_version = orig_pkg['Version']
+
+    pattern = re.escape(f"(= {orig_version})")
+    overrides.append({'pattern': pattern, 'original': f"(= {orig_version})", 'replacement': f"(= {new_version})"})
+
+    printfancy(f"Building {pkg_name}")
 
     # Collect data for jinja2 template insertion
     data = {}
     data['Package'] = pkg_name
     data['Architecture'] = arch
-    data['Version'] = versionnumber
+    data['Version'] = new_version
     data['Maintainer'] = maintainer
 
     data['Provides'] = update_list_with_orig_flavour('Provides', orig_pkg, flavour, orig_flavour, builddir, missing_okay=True)
@@ -585,8 +586,13 @@ def debian_style_build(distro_config_path, buildnumber, maintainer, verbose, nob
     printfancy(f"Set bitflux_version:        {bitflux_version}", timeout=3)
 
     # Return the newest latest linux kernel image package name
-    image_name, version_name = apt_get_linux_image_name(search_pkg, orig_flavour, verbose=verbose)
-    printfancy(f"Found image name:           {image_name} - {version_name}")
+    image_name, orig_version, arch = apt_get_linux_image_name(search_pkg, orig_flavour, verbose=verbose)
+    printfancy(f"Found image name:           {image_name}")
+    printfancy(f"Original version:           {orig_version} - {arch}")
+
+    # Make new version string
+    new_version = get_new_version(orig_version, bitflux_version, buildnumber)
+    printfancy(f"Set new version:            {new_version}")
 
     # Search patches for something that should match the kernel image package
     patches_dir = select_patches_dir(image_name, patches_root_dir='./patches')
@@ -599,7 +605,7 @@ def debian_style_build(distro_config_path, buildnumber, maintainer, verbose, nob
     src_dir = apt_get_source(image_name, verbose=verbose)
     printfancy(f"Found kernel src directory: {src_dir}")
 
-    debian_dir = deb_find_debian_dir(src_dir)
+    debian_dir = deb_find_debian_dir(src_dir, verbose=verbose)
     printfancy(f"Found DEBIAN directory: {debian_dir}")
 
     # Do patching steps
@@ -618,7 +624,7 @@ def debian_style_build(distro_config_path, buildnumber, maintainer, verbose, nob
 
     # Modify debian changelog
     printfancy("Modifying debian changelog")
-    deb_hack_changelog(bitflux_version, src_dir, buildnum=buildnumber, verbose=verbose, clean_patch=True)
+    deb_hack_changelog(new_version, src_dir, verbose=verbose, clean_patch=True)
 
     # DEPRECATED functionality required for older builds pre 6.8 24.04, not updated with flavour, orig_flavour
     try:
@@ -634,7 +640,7 @@ def debian_style_build(distro_config_path, buildnumber, maintainer, verbose, nob
     # Rust tools are also changing relatively often, so we need to update them
     #  ubuntu builds are depending on deb package conventions for rustc executable names
     printfancy("Update rust tools")
-    update_rust_tools(src_dir, verbose=True)
+    update_rust_tools(src_dir, verbose=verbose)
 
     # Build deb packages
     if nobuild:
@@ -645,14 +651,10 @@ def debian_style_build(distro_config_path, buildnumber, maintainer, verbose, nob
     except:
         build_debs_hack(src_dir, verbose=verbose)
 
-    # Getting version number from built debs
-    versionnumber, arch = get_package_stats(version_ref_pkg)
-    printfancy(f"Package version:            {versionnumber}  arch: {arch}")
-
     # Build meta packages
     printfancy("Build meta packages")
     for metapkg_config in metapkgs:
-        build_meta_pkg(metapkg_config, maintainer, versionnumber, arch, flavour, orig_flavour, verbose=verbose)
+        build_meta_pkg(metapkg_config, maintainer, new_version, arch, flavour, orig_flavour, verbose=verbose)
 
     # Copy outputs
     run_cmd("rm -rf ./output;", allow_errors=True, verbose=verbose)
